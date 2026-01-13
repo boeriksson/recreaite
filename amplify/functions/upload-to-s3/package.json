@@ -1,0 +1,9 @@
+{
+  "name": "upload-to-s3",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.705.0",
+    "@aws-sdk/s3-request-presigner": "^3.705.0"
+  }
+}
