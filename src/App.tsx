@@ -1,99 +1,83 @@
-import { useState } from 'react'
-import { uploadData } from 'aws-amplify/storage'
-import './App.css'
+import { Toaster } from "@/components/ui/toaster"
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClientInstance } from '@/lib/query-client'
+import NavigationTracker from '@/lib/NavigationTracker'
+import { pagesConfig } from './pages.config'
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import PageNotFound from './lib/PageNotFound';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import AmplifyAuth from '@/components/auth/AmplifyAuth';
+
+const { Pages, Layout, mainPage } = pagesConfig;
+const mainPageKey = mainPage ?? Object.keys(Pages)[0];
+const MainPage = mainPageKey ? Pages[mainPageKey] : () => <></>;
+
+const LayoutWrapper = ({ children, currentPageName }: { children: React.ReactNode, currentPageName: string }) => Layout ?
+  <Layout currentPageName={currentPageName}>{children}</Layout>
+  : <>{children}</>;
+
+const AuthenticatedApp = () => {
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+
+  // Show loading spinner while checking app public settings or auth
+  if (isLoadingPublicSettings || isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Handle authentication errors
+  if (authError) {
+    if (authError.type === 'user_not_registered') {
+      return <UserNotRegisteredError />;
+    } else if (authError.type === 'auth_required') {
+      // Redirect to login automatically
+      navigateToLogin();
+      return null;
+    }
+  }
+
+  // Render the main app
+  return (
+    <Routes>
+      <Route path="/" element={
+        <LayoutWrapper currentPageName={mainPageKey}>
+          <MainPage />
+        </LayoutWrapper>
+      } />
+      {Object.entries(Pages).map(([path, Page]) => (
+        <Route
+          key={path}
+          path={`/${path}`}
+          element={
+            <LayoutWrapper currentPageName={path}>
+              <Page />
+            </LayoutWrapper>
+          }
+        />
+      ))}
+      <Route path="*" element={<PageNotFound />} />
+    </Routes>
+  );
+};
+
 
 function App() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadResult, setUploadResult] = useState<string>('')
-  const [apiResult, setApiResult] = useState<string>('')
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      setSelectedFile(file)
-      setUploadResult('')
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!selectedFile) return
-
-    setUploading(true)
-    setUploadResult('')
-
-    try {
-      const result = await uploadData({
-        path: `images/${Date.now()}-${selectedFile.name}`,
-        data: selectedFile,
-        options: {
-          contentType: selectedFile.type,
-        }
-      }).result
-
-      setUploadResult(`Successfully uploaded: ${result.path}`)
-    } catch (error) {
-      console.error('Error uploading file:', error)
-      setUploadResult(`Error: ${error instanceof Error ? error.message : 'Upload failed'}`)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleApiCall = async () => {
-    setApiResult('Loading...')
-
-    try {
-      // Example: Call a public API (JSONPlaceholder)
-      const response = await fetch('https://jsonplaceholder.typicode.com/posts/1')
-      const data = await response.json()
-
-      setApiResult(`API Response: ${data.title}`)
-    } catch (error) {
-      console.error('Error calling API:', error)
-      setApiResult(`Error: ${error instanceof Error ? error.message : 'API call failed'}`)
-    }
-  }
 
   return (
-    <div className="App">
-      <h1>Recreaite</h1>
-      <p>React + AWS Amplify Demo</p>
-
-      <div className="card">
-        <h2>Upload Image to S3</h2>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          disabled={uploading}
-        />
-        {selectedFile && (
-          <p>Selected: {selectedFile.name}</p>
-        )}
-        <button
-          onClick={handleUpload}
-          disabled={!selectedFile || uploading}
-        >
-          {uploading ? 'Uploading...' : 'Upload to S3'}
-        </button>
-        {uploadResult && (
-          <p className={uploadResult.includes('Error') ? 'error' : 'success'}>
-            {uploadResult}
-          </p>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>External API Call</h2>
-        <button onClick={handleApiCall}>
-          Call Sample API
-        </button>
-        {apiResult && (
-          <p className="api-result">{apiResult}</p>
-        )}
-      </div>
-    </div>
+    <AuthProvider>
+      <QueryClientProvider client={queryClientInstance}>
+        <Router>
+          <NavigationTracker />
+          <AuthenticatedApp />
+        </Router>
+        <Toaster />
+        <AmplifyAuth />
+      </QueryClientProvider>
+    </AuthProvider>
   )
 }
 
