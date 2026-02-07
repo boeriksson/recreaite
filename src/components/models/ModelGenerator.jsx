@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { SignedImage } from "@/components/ui/SignedImage";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import {
 import { X, Sparkles, Loader2, ChevronDown, Lightbulb, Upload, Image as ImageIcon } from 'lucide-react';
 
 export default function ModelGenerator({ onClose, onSave, darkMode }) {
+  const { isAuthenticated, navigateToLogin } = useAuth();
   const [generating, setGenerating] = useState(false);
   const [portraitImage, setPortraitImage] = useState(null);
   const [showExpert, setShowExpert] = useState(false);
@@ -60,6 +62,12 @@ export default function ModelGenerator({ onClose, onSave, darkMode }) {
   };
 
   const handleGenerate = async () => {
+    // Require authentication for image generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     setGenerating(true);
     try {
       const genderText = modelData.gender === 'female' ? 'female' : modelData.gender === 'male' ? 'male' : 'androgynous';

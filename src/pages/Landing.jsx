@@ -2,10 +2,10 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
-import { 
-  Sparkles, 
-  Zap, 
-  Clock, 
+import {
+  Sparkles,
+  Zap,
+  Clock,
   TrendingUp,
   Check,
   ArrowRight,
@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import ModelCarousel from '../components/landing/ModelCarousel';
 import BeforeAfterSlider from '../components/landing/BeforeAfterSlider';
 import ImageCarousel from '../components/landing/ImageCarousel';
+import SignedImage from '@/components/ui/SignedImage';
 
 export default function Landing() {
   const heroRef = useRef(null);
@@ -199,8 +200,8 @@ export default function Landing() {
                 className="relative group cursor-pointer"
               >
                 <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-xl">
-                  <img 
-                    src={img} 
+                  <SignedImage
+                    src={img}
                     alt={`Example ${idx + 1}`}
                     className="w-full h-full object-cover"
                   />
@@ -294,7 +295,7 @@ export default function Landing() {
               className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
             >
               <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
-                <img 
+                <SignedImage
                   src={exampleImages[0]}
                   alt="Cut production costs"
                   className="w-full h-full object-cover"
@@ -338,7 +339,7 @@ export default function Landing() {
                 </div>
               </div>
               <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl order-1 lg:order-2">
-                <img 
+                <SignedImage
                   src={exampleImages[1]}
                   alt="Get to market faster"
                   className="w-full h-full object-cover"
@@ -354,7 +355,7 @@ export default function Landing() {
               className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
             >
               <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
-                <img 
+                <SignedImage
                   src={exampleImages[2]}
                   alt="Increase diversity"
                   className="w-full h-full object-cover"

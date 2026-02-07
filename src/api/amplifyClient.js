@@ -18,9 +18,18 @@ const URL_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 export const getSignedUrl = async (pathOrUrl) => {
   if (!pathOrUrl) return null;
 
+  // Check if this is an S3 URL that needs signing
+  const isS3Url = pathOrUrl.includes('.s3.') && pathOrUrl.includes('.amazonaws.com');
+  const isAmplifyPath = pathOrUrl.startsWith('images/') || pathOrUrl.startsWith('public/');
+
+  // If not an S3 URL or Amplify path, return as-is (e.g., Supabase, external URLs)
+  if (!isS3Url && !isAmplifyPath) {
+    return pathOrUrl;
+  }
+
   // Extract the path from a full S3 URL if needed
   let path = pathOrUrl;
-  if (pathOrUrl.includes('.s3.') && pathOrUrl.includes('.amazonaws.com')) {
+  if (isS3Url) {
     // Extract path from URL like: https://bucket.s3.region.amazonaws.com/images/file.png
     const match = pathOrUrl.match(/\.amazonaws\.com\/(.+?)(\?|$)/);
     if (match) {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -79,7 +80,8 @@ const AccordionSection = ({ id, title, isComplete, children, openSection, setOpe
 export default function Upload() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+  const { isAuthenticated, navigateToLogin } = useAuth();
+
   const [mode, setMode] = useState('enkel'); // 'enkel', 'batch', 'style' or 'expert'
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -352,8 +354,14 @@ export default function Upload() {
   };
 
   const handleBatchGenerate = async () => {
+    // Require authentication for image generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     if (batchGarments.length === 0) return;
-    
+
     setBatchGenerating(true);
     setBatchProgress({ current: 0, total: batchGarments.length });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -407,6 +415,12 @@ export default function Upload() {
   };
 
   const handleGenerate = async () => {
+    // Require authentication for image generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     try {
       let garment;
       let garmentId;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { SignedImage } from "@/components/ui/SignedImage";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { X, Sparkles, Loader2, Check, Edit3 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 export default function BulkModelGenerator({ onClose, onSave, darkMode }) {
+  const { isAuthenticated, navigateToLogin } = useAuth();
   const [generating, setGenerating] = useState(false);
   const [models, setModels] = useState([]);
   const [selectedModels, setSelectedModels] = useState([]);
@@ -17,6 +19,12 @@ export default function BulkModelGenerator({ onClose, onSave, darkMode }) {
   const [abortController, setAbortController] = useState(null);
 
   const generateRandomModels = async () => {
+    // Require authentication for image generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     setGenerating(true);
     const controller = new AbortController();
     setAbortController(controller);

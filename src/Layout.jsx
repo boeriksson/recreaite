@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
-import { 
-  Shirt, 
-  Image, 
-  Upload, 
-  LayoutDashboard, 
-  Menu, 
+import { useAuth } from '@/lib/AuthContext';
+import {
+  Shirt,
+  Image,
+  Upload,
+  LayoutDashboard,
+  Menu,
   X,
   Sparkles,
   User,
@@ -28,41 +29,41 @@ import { GenerationStatusProvider } from './components/generation/GenerationStat
 import FloatingGenerationBar from './components/generation/FloatingGenerationBar';
 
 export default function Layout({ children, currentPageName }) {
+  const { user, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [subscription, setSubscription] = useState(null);
 
+  // Load subscription when user changes
   useEffect(() => {
-    const loadUser = async () => {
+    const loadSubscription = async () => {
+      if (!isAuthenticated || !user) {
+        setSubscription(null);
+        return;
+      }
+
       try {
-        const isAuth = await base44.auth.isAuthenticated();
-        if (isAuth) {
-          const userData = await base44.auth.me();
-          setUser(userData);
-          
-          // Load subscription
-          const subs = await base44.entities.Subscription.filter({ created_by: userData.email });
-          if (subs.length > 0) {
-            setSubscription(subs[0]);
-          } else {
-            // Create free subscription
-            const newSub = await base44.entities.Subscription.create({
-              plan: 'free',
-              images_generated: 0,
-              images_limit: 10
-            });
-            setSubscription(newSub);
-          }
+        // Load subscription
+        const subs = await base44.entities.Subscription.filter({ created_by: user.email });
+        if (subs.length > 0) {
+          setSubscription(subs[0]);
+        } else {
+          // Create free subscription
+          const newSub = await base44.entities.Subscription.create({
+            plan: 'free',
+            images_generated: 0,
+            images_limit: 10
+          });
+          setSubscription(newSub);
         }
       } catch (error) {
-        console.error('Failed to load user:', error);
+        console.error('Failed to load subscription:', error);
       }
     };
-    loadUser();
-  }, []);
+    loadSubscription();
+  }, [user, isAuthenticated]);
 
   const navItems = [
     { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -150,7 +151,7 @@ export default function Layout({ children, currentPageName }) {
               </button>
 
               {/* User Menu */}
-              {user ? (
+              {isAuthenticated && user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className={cn(
@@ -174,7 +175,7 @@ export default function Layout({ children, currentPageName }) {
                       <CreditCard className="h-4 w-4 mr-2" />
                       Uppgradera plan
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => base44.auth.logout()} className={darkMode ? "text-white" : "text-black"}>
+                    <DropdownMenuItem onClick={() => logout()} className={darkMode ? "text-white" : "text-black"}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Logga ut
                     </DropdownMenuItem>

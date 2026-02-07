@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, Check, RefreshCw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,6 +30,7 @@ const modelPrompts = [
 ];
 
 export default function GeneratePreMadePortraits({ onComplete }) {
+  const { isAuthenticated, navigateToLogin } = useAuth();
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState([]);
@@ -80,6 +82,12 @@ export default function GeneratePreMadePortraits({ onComplete }) {
   };
 
   const generatePreview = async () => {
+    // Require authentication for image generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     setGenerating(true);
     setProgress(0);
     const previews = {};
@@ -111,6 +119,12 @@ export default function GeneratePreMadePortraits({ onComplete }) {
   };
 
   const generateAllPortraits = async () => {
+    // Require authentication for image generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     setShowSettings(false);
     setPreviewMode(false);
     setGenerating(true);

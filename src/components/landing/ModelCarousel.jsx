@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import SignedImage from '@/components/ui/SignedImage';
 
 export default function ModelCarousel({ models }) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -29,8 +30,8 @@ export default function ModelCarousel({ models }) {
         >
           {models.slice(currentIndex, currentIndex + 4).map((model, idx) => (
             <div key={model.id} className="aspect-[3/4] rounded-2xl overflow-hidden bg-[#f5f5f7] dark:bg-white/5">
-              <img 
-                src={model.portrait_url || model.image_url} 
+              <SignedImage
+                src={model.portrait_url || model.image_url}
                 alt={model.name}
                 className="w-full h-full object-cover"
               />

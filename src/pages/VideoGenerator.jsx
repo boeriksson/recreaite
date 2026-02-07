@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, 
@@ -52,6 +53,7 @@ const AccordionSection = ({ id, title, isComplete, children, openSection, setOpe
 );
 
 export default function VideoGenerator() {
+  const { isAuthenticated, navigateToLogin } = useAuth();
   const [openSection, setOpenSection] = useState('select');
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedStyle, setSelectedStyle] = useState(null);
@@ -111,6 +113,12 @@ export default function VideoGenerator() {
   ];
 
   const handleGenerate = async () => {
+    // Require authentication for video generation
+    if (!isAuthenticated) {
+      navigateToLogin();
+      return;
+    }
+
     setGenerating(true);
     setProgress(0);
     window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import SignedImage from '@/components/ui/SignedImage';
 
 export default function ImageCarousel({ images }) {
   // Create a duplicated array for seamless loop
@@ -45,9 +46,9 @@ export default function ImageCarousel({ images }) {
               key={idx}
               className={`${sizeClass.width} ${sizeClass.height} flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300`}
             >
-              <img
+              <SignedImage
                 src={image}
-                alt={`Generated image ${idx}`}
+                alt={`Generated image ${idx + 1}`}
                 className="w-full h-full object-cover"
               />
             </div>
