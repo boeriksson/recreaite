@@ -60,14 +60,16 @@ export default function Dashboard() {
       color: 'from-purple-500/20 to-purple-600/20',
       iconColor: 'text-purple-400'
     },
-    { 
-      label: 'Denna vecka', 
+    {
+      label: 'Denna vecka',
       value: generatedImages.filter(img => {
+        if (!img.created_date && !img.createdAt) return false;
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
-        return new Date(img.created_date) > weekAgo;
-      }).length, 
-      icon: TrendingUp, 
+        const imgDate = new Date(img.created_date || img.createdAt);
+        return !isNaN(imgDate.getTime()) && imgDate > weekAgo;
+      }).length,
+      icon: TrendingUp,
       color: 'from-[#C9A962]/20 to-[#8B7355]/20',
       iconColor: 'text-[#C9A962]'
     },
@@ -119,9 +121,11 @@ export default function Dashboard() {
         <div className="bg-[#f5f5f7] dark:bg-white/5 rounded-2xl p-8">
           <div className="text-4xl font-semibold text-black dark:text-white mb-2">
             {allGeneratedImages.filter(img => {
+              if (!img.created_date && !img.createdAt) return false;
               const weekAgo = new Date();
               weekAgo.setDate(weekAgo.getDate() - 7);
-              return new Date(img.created_date) > weekAgo;
+              const imgDate = new Date(img.created_date || img.createdAt);
+              return !isNaN(imgDate.getTime()) && imgDate > weekAgo;
             }).length}
           </div>
           <div className="text-sm text-black/60 dark:text-white/60">Denna vecka</div>
@@ -237,7 +241,11 @@ export default function Dashboard() {
                     )}
                   </div>
                   <h3 className="text-black text-sm font-medium truncate">{garment.name}</h3>
-                  <p className="text-xs text-black/50">{format(new Date(garment.created_date), 'd MMM', { locale: sv })}</p>
+                  <p className="text-xs text-black/50">
+                    {(garment.created_date || garment.createdAt)
+                      ? format(new Date(garment.created_date || garment.createdAt), 'd MMM', { locale: sv })
+                      : '-'}
+                  </p>
                 </div>
               ))}
             </div>
