@@ -55,10 +55,13 @@ export const getSignedUrl = async (pathOrUrl) => {
 };
 
 // Lazy-initialize the Amplify Data client (after Amplify.configure() is called)
+// Use userPool auth mode which matches our schema's defaultAuthorizationMode
 let _client = null;
 const getClient = () => {
   if (!_client) {
-    _client = generateClient();
+    _client = generateClient({
+      authMode: 'userPool',
+    });
   }
   return _client;
 };

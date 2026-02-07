@@ -1,19 +1,22 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
 const schema = a.schema({
-  // Data models
-  // NOTE: Guest access enabled temporarily for testing - remove for production!
+  // Data models - authenticated users have full CRUD, guests can only read public data
   GeneratedImage: a.model({
     status: a.enum(['pending', 'processing', 'completed', 'failed']),
     image_url: a.string(),
     garment_id: a.string(),
     model_id: a.string(),
-    model_type: a.string(),  // Used by frontend code
+    model_type: a.string(),
     prompt_used: a.string(),
     garment_urls: a.string().array(),
     ai_analysis: a.json(),
     created_date: a.datetime(),
-  }).authorization((allow) => [allow.owner(), allow.guest(), allow.authenticated().to(['read'])]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+    allow.guest().to(['read']),
+  ]),
 
   Garment: a.model({
     name: a.string().required(),
@@ -22,7 +25,11 @@ const schema = a.schema({
     brand: a.string(),
     sku: a.string(),
     description: a.string(),
-  }).authorization((allow) => [allow.owner(), allow.guest(), allow.authenticated().to(['read'])]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+    allow.guest().to(['read']),
+  ]),
 
   Model: a.model({
     name: a.string().required(),
@@ -37,7 +44,11 @@ const schema = a.schema({
     skin_tone: a.string(),
     height: a.integer(),
     prompt: a.string(),
-  }).authorization((allow) => [allow.owner(), allow.guest(), allow.authenticated().to(['read'])]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+    allow.guest().to(['read']),
+  ]),
 
   UserSubscription: a.model({
     plan: a.enum(['free', 'basic', 'pro', 'enterprise']),
@@ -45,7 +56,10 @@ const schema = a.schema({
     images_limit: a.integer().default(10),
     period_start: a.datetime(),
     period_end: a.datetime(),
-  }).authorization((allow) => [allow.owner(), allow.guest()]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+  ]),
 
   Template: a.model({
     name: a.string().required(),
@@ -55,7 +69,11 @@ const schema = a.schema({
     configuration: a.json().required(),
     usage_count: a.integer().default(0),
     last_used: a.datetime(),
-  }).authorization((allow) => [allow.owner(), allow.guest(), allow.authenticated().to(['read'])]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+    allow.guest().to(['read']),
+  ]),
 
   BrandSeed: a.model({
     name: a.string().required(),
@@ -70,7 +88,11 @@ const schema = a.schema({
     visual_analysis: a.string(),
     color_palette: a.string(),
     photography_style: a.string(),
-  }).authorization((allow) => [allow.owner(), allow.guest(), allow.authenticated().to(['read'])]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+    allow.guest().to(['read']),
+  ]),
 
   CustomModel: a.model({
     name: a.string().required(),
@@ -80,20 +102,26 @@ const schema = a.schema({
     training_images: a.string().array(),
     status: a.enum(['uploading', 'training', 'ready', 'failed']),
     model_id: a.string(),
-  }).authorization((allow) => [allow.owner(), allow.guest()]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+  ]),
 
   ActivityLog: a.model({
     action: a.string().required(),
     page_name: a.string(),
     metadata: a.json(),
-  }).authorization((allow) => [allow.owner(), allow.guest()]),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+  ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: 'identityPool',  // Allow IAM-based auth (includes guest)
-    apiKeyAuthorizationMode: { expiresInDays: 30 },  // Backup API key auth
+    defaultAuthorizationMode: 'userPool',  // Authenticated users use Cognito User Pool
+    apiKeyAuthorizationMode: { expiresInDays: 30 },  // Backup for public data
   },
 });

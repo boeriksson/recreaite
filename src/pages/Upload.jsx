@@ -80,7 +80,15 @@ const AccordionSection = ({ id, title, isComplete, children, openSection, setOpe
 export default function Upload() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAuthenticated, navigateToLogin } = useAuth();
+  const { isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
+
+  // Redirect to login if not authenticated
+  React.useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated) {
+      navigateToLogin();
+      navigate('/');
+    }
+  }, [isAuthenticated, isLoadingAuth, navigateToLogin, navigate]);
 
   const [mode, setMode] = useState('enkel'); // 'enkel', 'batch', 'style' or 'expert'
   const [file, setFile] = useState(null);
