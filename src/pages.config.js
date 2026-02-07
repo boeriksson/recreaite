@@ -12,6 +12,7 @@ import Models from './pages/Models';
 import SiteScanner from './pages/SiteScanner';
 import Templates from './pages/Templates';
 import Upload from './pages/Upload';
+import UploadGarment from './pages/UploadGarment';
 import VideoGenerator from './pages/VideoGenerator';
 import __Layout from './Layout.jsx';
 
@@ -25,6 +26,7 @@ export const PAGES = {
     "SiteScanner": SiteScanner,
     "Templates": Templates,
     "Upload": Upload,
+    "UploadGarment": UploadGarment,
     "VideoGenerator": VideoGenerator,
 }
 

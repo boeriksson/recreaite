@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
+import JSZip from 'jszip';
 import {
   Image,
   Download,
@@ -11,10 +12,24 @@ import {
   Calendar,
   ZoomIn,
   Edit3,
-  Info
+  Info,
+  Loader2,
+  Search,
+  Filter,
+  ChevronDown,
+  Tag
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { SignedImage } from "@/components/ui/SignedImage";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,13 +41,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
-import { sv } from 'date-fns/locale';
+import { sv, enUS } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import ImageRefinementPanel from '../components/generation/ImageRefinementPanel';
+import { useLanguage } from '../components/LanguageContext';
+import AICategorizationPanel from '../components/gallery/AICategorizationPanel';
 
 export default function Gallery() {
   const queryClient = useQueryClient();
+  const { t, language } = useLanguage();
   const [selectedImage, setSelectedImage] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [editingImage, setEditingImage] = useState(null);
@@ -41,9 +59,42 @@ export default function Gallery() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [fullScale, setFullScale] = useState(false);
   const [infoImage, setInfoImage] = useState(null);
+  const [styleDescription, setStyleDescription] = useState(null);
+  const [loadingStyleDescription, setLoadingStyleDescription] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenerationProgress, setRegenerationProgress] = useState(0);
+  const [descriptionLanguage, setDescriptionLanguage] = useState('sv');
+  const [translatedDescription, setTranslatedDescription] = useState(null);
+  const [loadingTranslation, setLoadingTranslation] = useState(false);
   const imagePreviewRef = React.useRef(null);
+  const [generatingVariations, setGeneratingVariations] = useState(false);
+  const [variationCount, setVariationCount] = useState(3);
+  const [generatingGarmentDescription, setGeneratingGarmentDescription] = useState(null);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+
+  // Prevent body scroll when lightbox is open
+  React.useEffect(() => {
+    if (selectedImage) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedImage]);
+
+  // Filters and search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGarmentFilters, setSelectedGarmentFilters] = useState([]);
+  const [selectedModelFilters, setSelectedModelFilters] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [dateRange, setDateRange] = useState('all'); // all, today, week, month
+  const [statusFilter, setStatusFilter] = useState(['completed']);
+  const [currentPage, setCurrentPage] = useState(1);
+  const imagesPerPage = 24;
 
   React.useEffect(() => {
     if (isRegenerating && imagePreviewRef.current) {
@@ -86,6 +137,11 @@ export default function Gallery() {
   const { data: garments = [] } = useQuery({
     queryKey: ['garments'],
     queryFn: () => base44.entities.Garment.list()
+  });
+
+  const { data: models = [] } = useQuery({
+    queryKey: ['models'],
+    queryFn: () => base44.entities.Model.list()
   });
 
   const deleteMutation = useMutation({
@@ -137,6 +193,38 @@ export default function Gallery() {
       const garment = getGarment(image.garment_id);
       await handleDownload(image.image_url, garment?.name);
       await new Promise(resolve => setTimeout(resolve, 500)); // Delay between downloads
+    }
+  };
+
+  // Batch download as ZIP file
+  const handleBatchDownloadZip = async () => {
+    setDownloadingZip(true);
+    try {
+      const zip = new JSZip();
+      const selectedImages = images.filter(img => selectedIds.includes(img.id));
+
+      for (let i = 0; i < selectedImages.length; i++) {
+        const image = selectedImages[i];
+        const garment = getGarment(image.garment_id);
+        const response = await fetch(image.image_url);
+        const blob = await response.blob();
+        const fileName = `${garment?.name || 'image'}_${i + 1}.png`;
+        zip.file(fileName, blob);
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `heylook_images_${format(new Date(), 'yyyy-MM-dd')}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to create ZIP:', error);
+    } finally {
+      setDownloadingZip(false);
     }
   };
 

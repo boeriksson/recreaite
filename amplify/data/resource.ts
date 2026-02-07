@@ -12,6 +12,11 @@ const schema = a.schema({
     garment_urls: a.string().array(),
     ai_analysis: a.json(),
     created_date: a.datetime(),
+    // New fields for collections and tagging
+    collection_id: a.string(),
+    tags: a.string().array(),
+    ai_categories: a.string().array(),
+    ai_tags: a.string().array(),
   }).authorization((allow) => [
     allow.owner(),
     allow.authenticated(),
@@ -25,10 +30,46 @@ const schema = a.schema({
     brand: a.string(),
     sku: a.string(),
     description: a.string(),
+    // New fields for AI analysis
+    ai_description: a.string(),
+    original_image_url: a.string(),
   }).authorization((allow) => [
     allow.owner(),
     allow.authenticated(),
     allow.guest().to(['read']),
+  ]),
+
+  // New: Collection for organizing images
+  Collection: a.model({
+    name: a.string().required(),
+    description: a.string(),
+    color: a.string(),
+    image_count: a.integer().default(0),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
+    allow.guest().to(['read']),
+  ]),
+
+  // New: BatchJob for batch processing
+  BatchJob: a.model({
+    name: a.string().required(),
+    status: a.enum(['pending', 'processing', 'completed', 'failed', 'paused']),
+    garment_ids: a.string().array(),
+    configuration: a.json(),
+    scheduled_for: a.datetime(),
+    total_items: a.integer().default(0),
+    processed_items: a.integer().default(0),
+    successful_items: a.integer().default(0),
+    failed_items: a.integer().default(0),
+    failed_garment_ids: a.string().array(),
+    error_log: a.json(),
+    priority: a.integer().default(5),
+    started_at: a.datetime(),
+    completed_at: a.datetime(),
+  }).authorization((allow) => [
+    allow.owner(),
+    allow.authenticated(),
   ]),
 
   Model: a.model({

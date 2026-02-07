@@ -40,13 +40,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
-import { sv } from 'date-fns/locale';
+import { sv, enUS } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import SiteScanner from '../components/dashboard/SiteScanner';
+import { useLanguage } from '../components/LanguageContext';
 
 export default function Templates() {
   const queryClient = useQueryClient();
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -122,20 +124,20 @@ export default function Templates() {
       const importData = JSON.parse(text);
       
       await createMutation.mutateAsync({
-        name: importData.name + ' (Importerad)',
+        name: importData.name + ' ' + t.importedCopy,
         description: importData.description,
         category: importData.category,
         configuration: importData.configuration
       });
     } catch (error) {
       console.error('Import failed:', error);
-      alert('Kunde inte importera mall. Kontrollera att filen är korrekt.');
+      alert(t.couldNotImport);
     }
   };
 
   const handleDuplicate = async (template) => {
     await createMutation.mutateAsync({
-      name: template.name + ' (Kopia)',
+      name: template.name + ' ' + t.copy,
       description: template.description,
       category: template.category,
       configuration: template.configuration,
@@ -152,21 +154,21 @@ export default function Templates() {
 
   const getModelName = (modelId) => {
     const model = models.find(m => m.id === modelId);
-    return model?.name || 'Okänd modell';
+    return model?.name || t.unknownModel;
   };
 
   const getSeedName = (seedId) => {
     const seed = seeds.find(s => s.id === seedId);
-    return seed?.name || 'Ingen seed';
+    return seed?.name || t.noSeed;
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-black dark:text-white mb-2">Mallar & Seeds</h1>
+        <h1 className="text-3xl font-semibold text-black dark:text-white mb-2">{t.templatesAndSeeds}</h1>
         <p className="text-black/60 dark:text-white/60">
-          Spara och återanvänd kampanjkonfigurationer och varumärkesstilar
+          {t.saveAndReuseCampaigns}
         </p>
       </div>
 
@@ -182,22 +184,22 @@ export default function Templates() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Sök mallar..."
+            placeholder={t.searchTemplates}
             className="pl-10 bg-white dark:bg-white/5 border-black/10 dark:border-white/10"
           />
         </div>
         <div className="flex gap-3">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px] bg-white dark:bg-white/5 border-black/10 dark:border-white/10">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-white/5 border-black/10 dark:border-white/10 dark:text-white">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alla kategorier</SelectItem>
-              <SelectItem value="campaign">Kampanj</SelectItem>
-              <SelectItem value="product_category">Produktkategori</SelectItem>
-              <SelectItem value="seasonal">Säsong</SelectItem>
-              <SelectItem value="brand_style">Varumärkesstil</SelectItem>
-              <SelectItem value="custom">Anpassad</SelectItem>
+            <SelectContent className="bg-white dark:bg-[#1a1a1a] border-black/10 dark:border-white/10">
+              <SelectItem value="all">{t.allCategories}</SelectItem>
+              <SelectItem value="campaign">{t.campaign}</SelectItem>
+              <SelectItem value="product_category">{t.productCategory}</SelectItem>
+              <SelectItem value="seasonal">{t.seasonal}</SelectItem>
+              <SelectItem value="brand_style">{t.brandStyle}</SelectItem>
+              <SelectItem value="custom">{t.custom}</SelectItem>
             </SelectContent>
           </Select>
           
@@ -211,17 +213,17 @@ export default function Templates() {
             <Button variant="outline" className="border-black/10 dark:border-white/10" asChild>
               <span className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                Importera
+                {t.import}
               </span>
             </Button>
           </label>
-          
+
           <Button
             onClick={() => setShowCreateModal(true)}
             className="bg-[#0071e3] hover:bg-[#0077ED] text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Ny mall
+            {t.newTemplate}
           </Button>
         </div>
       </div>
@@ -236,16 +238,16 @@ export default function Templates() {
       ) : filteredTemplates.length === 0 ? (
         <div className="text-center py-16">
           <FileText className="h-16 w-16 text-white/20 mx-auto mb-4" />
-          <h2 className="text-xl text-white mb-2">Inga mallar ännu</h2>
+          <h2 className="text-xl text-white mb-2">{t.noTemplatesYet}</h2>
           <p className="text-white/60 mb-6">
-            Skapa din första mall för att snabbt återanvända konfigurationer
+            {t.createFirstTemplate}
           </p>
           <Button
             onClick={() => setShowCreateModal(true)}
             className="bg-[#0071e3] hover:bg-[#0077ED] text-white rounded-full"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Skapa mall
+            {t.createTemplate}
           </Button>
         </div>
       ) : (
@@ -290,7 +292,7 @@ export default function Templates() {
                 <div className="mb-3 space-y-1 text-xs">
                   {template.configuration.model_id && (
                     <div className="flex items-center gap-2 text-black/60 dark:text-white/60">
-                      <span>Modell:</span>
+                      <span>{t.model}:</span>
                       <span className="font-medium text-black dark:text-white">
                         {getModelName(template.configuration.model_id)}
                       </span>
@@ -298,15 +300,15 @@ export default function Templates() {
                   )}
                   {template.configuration.gender && !template.configuration.model_id && (
                     <div className="flex items-center gap-2 text-black/60 dark:text-white/60">
-                      <span>Kön:</span>
+                      <span>{t.gender}:</span>
                       <span className="font-medium text-black dark:text-white capitalize">
-                        {template.configuration.gender === 'female' ? 'Kvinna' : template.configuration.gender === 'male' ? 'Man' : 'Neutral'}
+                        {template.configuration.gender === 'female' ? t.woman : template.configuration.gender === 'male' ? t.man : t.neutral}
                       </span>
                     </div>
                   )}
                   {template.configuration.environment && (
                     <div className="flex items-center gap-2 text-black/60 dark:text-white/60">
-                      <span>Miljö:</span>
+                      <span>{t.environment}:</span>
                       <span className="font-medium text-black dark:text-white capitalize">
                         {template.configuration.environment.replace(/_/g, ' ')}
                       </span>
@@ -324,9 +326,9 @@ export default function Templates() {
 
                 {/* Stats */}
                 <div className="flex items-center gap-3 text-xs text-black/40 dark:text-white/40 mb-3">
-                  <span>Använd {template.usage_count || 0} ggr</span>
+                  <span>{t.usedTimes.replace('{count}', template.usage_count || 0)}</span>
                   {template.last_used && (
-                    <span>• {format(new Date(template.last_used), 'd MMM', { locale: sv })}</span>
+                    <span>• {format(new Date(template.last_used), 'd MMM', { locale: language === 'sv' ? sv : enUS })}</span>
                   )}
                 </div>
 
@@ -334,7 +336,7 @@ export default function Templates() {
                 <div className="flex gap-2">
                   <Link to={createPageUrl('Upload') + `?template=${template.id}`} className="flex-1">
                     <Button className="w-full bg-[#0071e3] hover:bg-[#0077ED] text-white text-sm">
-                      Använd mall
+                      {t.useTemplate}
                     </Button>
                   </Link>
                   <Button
@@ -402,20 +404,20 @@ export default function Templates() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="bg-[#1A1A1A] border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Ta bort mall</AlertDialogTitle>
+            <AlertDialogTitle className="text-white">{t.deleteTemplate}</AlertDialogTitle>
             <AlertDialogDescription className="text-white/60">
-              Är du säker på att du vill ta bort denna mall? Denna åtgärd kan inte ångras.
+              {t.deleteTemplateConfirm}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="bg-white/10 text-white border-white/20 hover:bg-white/20">
-              Avbryt
+              {t.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteMutation.mutate(deleteId)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Ta bort
+              {t.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -425,6 +427,7 @@ export default function Templates() {
 }
 
 function TemplateModal({ template, models, seeds, onClose, onSave }) {
+  const { t, language } = useLanguage();
   const [formData, setFormData] = useState({
     name: template?.name || '',
     description: template?.description || '',
@@ -467,7 +470,7 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
       >
         <div className="sticky top-0 bg-[#1A1A1A] border-b border-white/10 p-6 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-white">
-            {template ? 'Redigera mall' : 'Skapa ny mall'}
+            {template ? t.editTemplate : t.createNewTemplate}
           </h2>
           <button
             onClick={onClose}
@@ -480,27 +483,27 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
         <div className="p-6 space-y-6">
           {/* Basic Info */}
           <div>
-            <Label className="text-white/80">Namn *</Label>
+            <Label className="text-white/80">{t.name} *</Label>
             <Input
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="T.ex. Sommarkampanj 2025"
-              className="mt-2 bg-white/5 border-white/10 text-white"
+              placeholder={language === 'sv' ? 'T.ex. Sommarkampanj 2025' : 'E.g. Summer Campaign 2025'}
+              className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/40"
             />
           </div>
 
           <div>
-            <Label className="text-white/80">Beskrivning</Label>
+            <Label className="text-white/80">{t.description}</Label>
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Beskriv vad denna mall används till..."
-              className="mt-2 bg-white/5 border-white/10 text-white min-h-[80px]"
+              placeholder={language === 'sv' ? 'Beskriv vad denna mall används till...' : 'Describe what this template is used for...'}
+              className="mt-2 bg-white/5 border-white/10 text-white min-h-[80px] placeholder:text-white/40"
             />
           </div>
 
           <div>
-            <Label className="text-white/80">Kategori *</Label>
+            <Label className="text-white/80">{t.category} *</Label>
             <Select
               value={formData.category}
               onValueChange={(value) => setFormData({ ...formData, category: value })}
@@ -508,23 +511,23 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
               <SelectTrigger className="mt-2 bg-white/5 border-white/10 text-white">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="campaign">Kampanj</SelectItem>
-                <SelectItem value="product_category">Produktkategori</SelectItem>
-                <SelectItem value="seasonal">Säsong</SelectItem>
-                <SelectItem value="brand_style">Varumärkesstil</SelectItem>
-                <SelectItem value="custom">Anpassad</SelectItem>
+              <SelectContent className="bg-[#1a1a1a] border-white/10">
+                <SelectItem value="campaign">{t.campaign}</SelectItem>
+                <SelectItem value="product_category">{t.productCategory}</SelectItem>
+                <SelectItem value="seasonal">{t.seasonal}</SelectItem>
+                <SelectItem value="brand_style">{t.brandStyle}</SelectItem>
+                <SelectItem value="custom">{t.custom}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Configuration */}
           <div className="pt-4 border-t border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-4">Konfiguration</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">{t.configuration}</h3>
 
             <div className="space-y-4">
               <div>
-                <Label className="text-white/80">Modell</Label>
+                <Label className="text-white/80">{t.model}</Label>
                 <Select
                   value={formData.configuration.model_id}
                   onValueChange={(value) => setFormData({
@@ -533,10 +536,10 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
                   })}
                 >
                   <SelectTrigger className="mt-2 bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Välj modell (valfritt)" />
+                    <SelectValue placeholder={t.selectModelOptional} />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={null}>Ingen specifik modell</SelectItem>
+                  <SelectContent className="bg-[#1a1a1a] border-white/10">
+                    <SelectItem value={null}>{t.noSpecificModel}</SelectItem>
                     {models.map(model => (
                       <SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>
                     ))}
@@ -546,7 +549,7 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
 
               {!formData.configuration.model_id && (
                 <div>
-                  <Label className="text-white/80">Kön</Label>
+                  <Label className="text-white/80">{t.gender}</Label>
                   <Select
                     value={formData.configuration.gender}
                     onValueChange={(value) => setFormData({
@@ -555,20 +558,20 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
                     })}
                   >
                     <SelectTrigger className="mt-2 bg-white/5 border-white/10 text-white">
-                      <SelectValue placeholder="Välj kön (valfritt)" />
+                      <SelectValue placeholder={t.selectGenderOptional} />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={null}>Inget kön valt</SelectItem>
-                      <SelectItem value="female">Kvinna</SelectItem>
-                      <SelectItem value="male">Man</SelectItem>
-                      <SelectItem value="neutral">Neutral</SelectItem>
+                    <SelectContent className="bg-[#1a1a1a] border-white/10">
+                      <SelectItem value={null}>{t.noGenderSelected}</SelectItem>
+                      <SelectItem value="female">{t.woman}</SelectItem>
+                      <SelectItem value="male">{t.man}</SelectItem>
+                      <SelectItem value="neutral">{t.neutral}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               )}
 
               <div>
-                <Label className="text-white/80">Miljö</Label>
+                <Label className="text-white/80">{t.environment}</Label>
                 <Select
                   value={formData.configuration.environment}
                   onValueChange={(value) => setFormData({
@@ -579,35 +582,35 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
                   <SelectTrigger className="mt-2 bg-white/5 border-white/10 text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-[#1a1a1a] border-white/10">
                     <SelectItem value="studio">Studio</SelectItem>
                     <SelectItem value="urban">Urban</SelectItem>
-                    <SelectItem value="minimal">Minimalistisk</SelectItem>
-                    <SelectItem value="nature">Natur</SelectItem>
+                    <SelectItem value="minimal">{language === 'sv' ? 'Minimalistisk' : 'Minimalist'}</SelectItem>
+                    <SelectItem value="nature">{language === 'sv' ? 'Natur' : 'Nature'}</SelectItem>
                     <SelectItem value="ugc">UGC</SelectItem>
                     <SelectItem value="ugc_selfie">UGC Selfie</SelectItem>
-                    <SelectItem value="custom">Anpassad</SelectItem>
+                    <SelectItem value="custom">{t.custom}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {formData.configuration.environment === 'custom' && (
                 <div>
-                  <Label className="text-white/80">Anpassad miljö</Label>
+                  <Label className="text-white/80">{t.customEnvironment}</Label>
                   <Textarea
                     value={formData.configuration.custom_environment}
                     onChange={(e) => setFormData({
                       ...formData,
                       configuration: { ...formData.configuration, custom_environment: e.target.value }
                     })}
-                    placeholder="Beskriv miljön..."
-                    className="mt-2 bg-white/5 border-white/10 text-white min-h-[60px]"
+                    placeholder={t.describeEnvironment}
+                    className="mt-2 bg-white/5 border-white/10 text-white min-h-[60px] placeholder:text-white/40"
                   />
                 </div>
               )}
 
               <div>
-                <Label className="text-white/80">Brand Seed</Label>
+                <Label className="text-white/80">{t.brandSeed}</Label>
                 <Select
                   value={formData.configuration.brand_seed_id}
                   onValueChange={(value) => setFormData({
@@ -616,10 +619,10 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
                   })}
                 >
                   <SelectTrigger className="mt-2 bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Välj seed (valfritt)" />
+                    <SelectValue placeholder={t.selectSeedOptional} />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={null}>Ingen seed</SelectItem>
+                  <SelectContent className="bg-[#1a1a1a] border-white/10">
+                    <SelectItem value={null}>{t.noSeed}</SelectItem>
                     {seeds.map(seed => (
                       <SelectItem key={seed.id} value={seed.id}>{seed.name}</SelectItem>
                     ))}
@@ -638,20 +641,20 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
                     })}
                     className="rounded"
                   />
-                  <Label className="text-white/80 text-sm">Använd seedens miljö</Label>
+                  <Label className="text-white/80 text-sm">{t.useSeedEnvironment}</Label>
                 </div>
               )}
 
               <div>
-                <Label className="text-white/80">Anpassad prompt (valfritt)</Label>
+                <Label className="text-white/80">{t.customPromptOptional}</Label>
                 <Textarea
                   value={formData.configuration.custom_prompt}
                   onChange={(e) => setFormData({
                     ...formData,
                     configuration: { ...formData.configuration, custom_prompt: e.target.value }
                   })}
-                  placeholder="Expert-läge prompt..."
-                  className="mt-2 bg-white/5 border-white/10 text-white min-h-[80px]"
+                  placeholder={t.expertModePrompt}
+                  className="mt-2 bg-white/5 border-white/10 text-white min-h-[80px] placeholder:text-white/40"
                 />
               </div>
             </div>
@@ -664,7 +667,7 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
             variant="outline"
             className="border-white/10 text-white hover:bg-white/10"
           >
-            Avbryt
+            {t.cancel}
           </Button>
           <Button
             onClick={handleSave}
@@ -674,12 +677,12 @@ function TemplateModal({ template, models, seeds, onClose, onSave }) {
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sparar...
+                {t.saving}
               </>
             ) : (
               <>
                 <Check className="h-4 w-4 mr-2" />
-                {template ? 'Uppdatera' : 'Skapa mall'}
+                {template ? t.update : t.createTemplate}
               </>
             )}
           </Button>

@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
 import { Plus, Trash2, User, MoreVertical, Sparkles, Search, Edit, SlidersHorizontal } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { SignedImage } from "@/components/ui/SignedImage";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,9 +26,11 @@ import {
 import ModelGenerator from '../components/models/ModelGenerator';
 import BulkModelGenerator from '../components/models/BulkModelGenerator';
 import ModelEditor from '../components/models/ModelEditor';
+import { useLanguage } from '../components/LanguageContext';
 
 export default function Models() {
   const queryClient = useQueryClient();
+  const { t, language } = useLanguage();
   const [darkMode, setDarkMode] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
   const [showBulkGenerator, setShowBulkGenerator] = useState(false);
@@ -222,8 +225,8 @@ export default function Models() {
                   className="aspect-[3/4] rounded-2xl overflow-hidden bg-[#f5f5f7] dark:bg-white/5 hover:shadow-lg transition-all w-full relative"
                 >
                   {(model.portrait_url || model.image_url) ? (
-                    <img 
-                      src={model.portrait_url || model.image_url} 
+                    <SignedImage
+                      src={model.portrait_url || model.image_url}
                       alt={model.name}
                       className="w-full h-full object-cover object-top"
                     />
@@ -311,8 +314,8 @@ export default function Models() {
             >
             <div className="flex-1 overflow-auto p-6">
               <div className="rounded-xl overflow-hidden bg-black/5 dark:bg-white/5 max-w-md mx-auto">
-                <img 
-                  src={selectedModel.portrait_url || selectedModel.image_url} 
+                <SignedImage
+                  src={selectedModel.portrait_url || selectedModel.image_url}
                   alt={`${selectedModel.name} - Portrait`}
                   className="w-full h-auto object-cover"
                 />

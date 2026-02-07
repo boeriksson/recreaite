@@ -38,10 +38,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { sv } from 'date-fns/locale';
+import { sv, enUS } from 'date-fns/locale';
+import { useLanguage } from '../components/LanguageContext';
 
 export default function ModelTraining() {
   const queryClient = useQueryClient();
+  const { t, language } = useLanguage();
   const [showNew, setShowNew] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
@@ -59,10 +61,10 @@ export default function ModelTraining() {
   });
 
   const statusConfig = {
-    uploading: { color: 'bg-blue-500/20 text-blue-400', icon: Upload, label: 'Laddar upp' },
-    training: { color: 'bg-yellow-500/20 text-yellow-400', icon: Loader2, label: 'Tränar' },
-    ready: { color: 'bg-green-500/20 text-green-400', icon: Check, label: 'Klar' },
-    failed: { color: 'bg-red-500/20 text-red-400', icon: AlertCircle, label: 'Misslyckades' }
+    uploading: { color: 'bg-blue-500/20 text-blue-400', icon: Upload, label: language === 'sv' ? 'Laddar upp' : 'Uploading' },
+    training: { color: 'bg-yellow-500/20 text-yellow-400', icon: Loader2, label: language === 'sv' ? 'Tränar' : 'Training' },
+    ready: { color: 'bg-green-500/20 text-green-400', icon: Check, label: language === 'sv' ? 'Klar' : 'Ready' },
+    failed: { color: 'bg-red-500/20 text-red-400', icon: AlertCircle, label: language === 'sv' ? 'Misslyckades' : 'Failed' }
   };
 
   return (
@@ -71,10 +73,10 @@ export default function ModelTraining() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-light text-black dark:text-white mb-1">
-            Träna egna AI-modeller
+            {t.trainCustomModels}
           </h1>
           <p className="text-black/60 dark:text-white/60">
-            Ladda upp bilder för att lära AI specifika poser eller stilar
+            {t.uploadImagesToTeach}
           </p>
         </div>
 
@@ -83,7 +85,7 @@ export default function ModelTraining() {
           className="bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full"
         >
           <Sparkles className="h-4 w-4 mr-2" />
-          Ny modell
+          {t.newModel}
         </Button>
       </div>
 
@@ -93,27 +95,27 @@ export default function ModelTraining() {
           <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center mb-4">
             <ImageIcon className="h-5 w-5 text-blue-500" />
           </div>
-          <h3 className="font-medium text-black dark:text-white mb-2">Pose-träning</h3>
+          <h3 className="font-medium text-black dark:text-white mb-2">{t.poseTraining}</h3>
           <p className="text-sm text-black/60 dark:text-white/60">
-            Lär AI specifika poser genom att ladda upp 5-10 bilder med samma pose
+            {t.learnSpecificPoses}
           </p>
         </div>
         <div className="bg-[#f5f5f7] dark:bg-white/5 rounded-2xl p-6">
           <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center mb-4">
             <Sparkles className="h-5 w-5 text-purple-500" />
           </div>
-          <h3 className="font-medium text-black dark:text-white mb-2">Stil-träning</h3>
+          <h3 className="font-medium text-black dark:text-white mb-2">{t.styleTraining}</h3>
           <p className="text-sm text-black/60 dark:text-white/60">
-            Skapa konsistent estetik med bilder som delar samma visuella stil
+            {t.createConsistentAesthetic}
           </p>
         </div>
         <div className="bg-[#f5f5f7] dark:bg-white/5 rounded-2xl p-6">
           <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
             <Check className="h-5 w-5 text-green-500" />
           </div>
-          <h3 className="font-medium text-black dark:text-white mb-2">Komposition</h3>
+          <h3 className="font-medium text-black dark:text-white mb-2">{t.composition}</h3>
           <p className="text-sm text-black/60 dark:text-white/60">
-            Lär AI layout och kompositioner från dina referensbilder
+            {t.learnLayoutComposition}
           </p>
         </div>
       </div>
@@ -128,16 +130,16 @@ export default function ModelTraining() {
       ) : customModels.length === 0 ? (
         <div className="text-center py-16">
           <Sparkles className="h-16 w-16 text-black/20 dark:text-white/20 mx-auto mb-4" />
-          <h2 className="text-xl text-black dark:text-white mb-2">Inga tränade modeller ännu</h2>
+          <h2 className="text-xl text-black dark:text-white mb-2">{t.noTrainedModels}</h2>
           <p className="text-black/60 dark:text-white/60 mb-6">
-            Skapa din första anpassade AI-modell
+            {t.createFirstCustomModel}
           </p>
           <Button
             onClick={() => setShowNew(true)}
             className="bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full"
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            Kom igång
+            {t.getStarted}
           </Button>
         </div>
       ) : (
@@ -163,7 +165,7 @@ export default function ModelTraining() {
                   ))}
                   {model.training_images?.length > 3 && (
                     <div className="col-span-3 text-center text-xs text-black/40 dark:text-white/40 mt-1">
-                      +{model.training_images.length - 3} fler bilder
+                      +{model.training_images.length - 3} {t.moreImages}
                     </div>
                   )}
                 </div>
@@ -183,10 +185,10 @@ export default function ModelTraining() {
                   <div className="flex items-center gap-3 mt-3 text-xs text-black/40 dark:text-white/40">
                     <span className="capitalize">{model.type}</span>
                     {model.trained_date && (
-                      <span>{format(new Date(model.trained_date), 'd MMM', { locale: sv })}</span>
+                      <span>{format(new Date(model.trained_date), 'd MMM', { locale: language === 'sv' ? sv : enUS })}</span>
                     )}
                     {model.usage_count > 0 && (
-                      <span>{model.usage_count} användningar</span>
+                      <span>{model.usage_count} {t.uses}</span>
                     )}
                   </div>
                 </div>
@@ -198,7 +200,7 @@ export default function ModelTraining() {
                       size="sm"
                       className="flex-1 bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full"
                     >
-                      Använd modell
+                      {t.useModel}
                     </Button>
                   )}
                   <Button
@@ -237,20 +239,20 @@ export default function ModelTraining() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="bg-[#1A1A1A] border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Ta bort modell</AlertDialogTitle>
+            <AlertDialogTitle className="text-white">{t.deleteModelTraining}</AlertDialogTitle>
             <AlertDialogDescription className="text-white/60">
-              Är du säker på att du vill ta bort denna tränade modell? Denna åtgärd kan inte ångras.
+              {t.deleteTrainedModelConfirm}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="bg-white/10 text-white border-white/20 hover:bg-white/20">
-              Avbryt
+              {t.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteMutation.mutate(deleteId)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Ta bort
+              {t.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -260,6 +262,7 @@ export default function ModelTraining() {
 }
 
 function NewModelForm({ onClose, onSuccess }) {
+  const { t, language } = useLanguage();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -328,7 +331,7 @@ function NewModelForm({ onClose, onSuccess }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-black dark:text-white">Träna ny modell</h2>
+          <h2 className="text-xl font-semibold text-black dark:text-white">{t.trainNewModel}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
@@ -340,56 +343,56 @@ function NewModelForm({ onClose, onSuccess }) {
         <div className="p-6 space-y-6">
           {/* Basic Info */}
           <div>
-            <Label className="text-black dark:text-white">Namn *</Label>
+            <Label className="text-black dark:text-white">{t.name} *</Label>
             <Input
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="T.ex. Sittande pose"
-              className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10"
+              placeholder={language === 'sv' ? 'T.ex. Sittande pose' : 'E.g. Sitting pose'}
+              className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10 dark:text-white dark:placeholder:text-white/40"
             />
           </div>
 
           <div>
-            <Label className="text-black dark:text-white">Typ *</Label>
+            <Label className="text-black dark:text-white">{t.type} *</Label>
             <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-              <SelectTrigger className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10">
+              <SelectTrigger className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10 dark:text-white">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pose">Pose</SelectItem>
-                <SelectItem value="style">Stil</SelectItem>
-                <SelectItem value="composition">Komposition</SelectItem>
+              <SelectContent className="bg-white dark:bg-[#1a1a1a] border-black/10 dark:border-white/10">
+                <SelectItem value="pose">{t.pose}</SelectItem>
+                <SelectItem value="style">{t.style}</SelectItem>
+                <SelectItem value="composition">{t.composition}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <Label className="text-black dark:text-white">Beskrivning</Label>
+            <Label className="text-black dark:text-white">{t.description}</Label>
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Vad ska denna modell lära sig?"
-              className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10 min-h-[80px]"
+              placeholder={t.whatShouldLearn}
+              className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10 min-h-[80px] dark:text-white dark:placeholder:text-white/40"
             />
           </div>
 
           <div>
-            <Label className="text-black dark:text-white">Träningsprompt (valfritt)</Label>
+            <Label className="text-black dark:text-white">{t.trainingPromptOptional}</Label>
             <Input
               value={formData.training_prompt}
               onChange={(e) => setFormData({ ...formData, training_prompt: e.target.value })}
-              placeholder="T.ex. 'model sitting on chair, professional photography'"
-              className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10"
+              placeholder={language === 'sv' ? "T.ex. 'model sitting on chair, professional photography'" : "E.g. 'model sitting on chair, professional photography'"}
+              className="mt-2 bg-[#f5f5f7] dark:bg-white/5 border-black/10 dark:border-white/10 dark:text-white dark:placeholder:text-white/40"
             />
           </div>
 
           {/* Image Upload */}
           <div>
             <Label className="text-black dark:text-white mb-2 flex items-center justify-between">
-              <span>Träningsbilder * (minst 3, rekommenderat 5-10)</span>
-              <span className="text-sm text-black/40 dark:text-white/40">{images.length} uppladdade</span>
+              <span>{t.trainingImages} * ({t.atLeast3Recommended})</span>
+              <span className="text-sm text-black/40 dark:text-white/40">{images.length} {t.uploaded}</span>
             </Label>
-            
+
             <input
               type="file"
               multiple
@@ -398,7 +401,7 @@ function NewModelForm({ onClose, onSuccess }) {
               className="hidden"
               id="training-images"
             />
-            
+
             <label
               htmlFor="training-images"
               className={cn(
@@ -409,13 +412,13 @@ function NewModelForm({ onClose, onSuccess }) {
               {uploading ? (
                 <>
                   <Loader2 className="h-8 w-8 text-[#392599] animate-spin mb-2" />
-                  <p className="text-sm text-black dark:text-white">Laddar upp...</p>
+                  <p className="text-sm text-black dark:text-white">{t.uploading}</p>
                 </>
               ) : (
                 <>
                   <Upload className="h-8 w-8 text-black/40 dark:text-white/40 mb-2" />
-                  <p className="text-sm text-black dark:text-white">Klicka för att välja bilder</p>
-                  <p className="text-xs text-black/40 dark:text-white/40 mt-1">eller dra och släpp</p>
+                  <p className="text-sm text-black dark:text-white">{t.clickToSelectImages}</p>
+                  <p className="text-xs text-black/40 dark:text-white/40 mt-1">{t.orDragAndDrop}</p>
                 </>
               )}
             </label>
@@ -442,12 +445,12 @@ function NewModelForm({ onClose, onSuccess }) {
             <div className="flex gap-3">
               <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-black dark:text-white space-y-1">
-                <p className="font-medium">Tips för bästa resultat:</p>
+                <p className="font-medium">{t.tipsForBestResults}</p>
                 <ul className="text-black/60 dark:text-white/60 space-y-1 ml-4 list-disc">
-                  <li>Använd bilder med liknande ljussättning och kvalitet</li>
-                  <li>För pose-träning: samma pose men olika modeller/kläder</li>
-                  <li>För stil-träning: olika motiv men samma estetik</li>
-                  <li>Minst 5 bilder rekommenderas, 10+ är optimalt</li>
+                  <li>{t.useSimilarLighting}</li>
+                  <li>{t.forPoseTraining}</li>
+                  <li>{t.forStyleTraining}</li>
+                  <li>{t.minImagesRecommended}</li>
                 </ul>
               </div>
             </div>
@@ -461,7 +464,7 @@ function NewModelForm({ onClose, onSuccess }) {
             variant="outline"
             className="flex-1 border-black/10 dark:border-white/10"
           >
-            Avbryt
+            {t.cancel}
           </Button>
           <Button
             onClick={handleTrain}
@@ -471,12 +474,12 @@ function NewModelForm({ onClose, onSuccess }) {
             {training ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Startar träning...
+                {t.startingTraining}
               </>
             ) : (
               <>
                 <Play className="h-4 w-4 mr-2" />
-                Starta träning
+                {t.startTraining}
               </>
             )}
           </Button>

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Sparkles, 
+import {
+  Sparkles,
   Download,
   RefreshCw,
   Loader2,
@@ -17,7 +17,15 @@ import {
   Save,
   X,
   AlertCircle,
-  Info
+  Info,
+  Play,
+  Pause,
+  Trash2,
+  Clock,
+  Calendar,
+  Plus as PlusIcon,
+  XCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { SignedImage } from "@/components/ui/SignedImage";
@@ -31,13 +39,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { format } from 'date-fns';
+import { sv } from 'date-fns/locale';
 
 import FileDropzone from '../components/upload/FileDropzone';
 import GenerationProgress from '../components/generation/GenerationProgress';
 import ImageRefinementPanel from '../components/generation/ImageRefinementPanel';
+import AIStylist from '../components/styling/AIStylist';
+import BatchJobCreator from '../components/batch/BatchJobCreator';
+import { useLanguage } from '../components/LanguageContext';
 
-const STUDIO_PROMPT = 'Professional studio photography with consistent soft diffused lighting from key light at 45 degrees, fill light opposite side, and subtle rim light. Clean white seamless background, color temperature 5500K, high-key lighting setup maintaining exact same brightness and shadow falloff across all images. Model positioned center frame with even illumination.';
+const STUDIO_PROMPT = 'Professional studio photography with consistent soft diffused lighting from key light at 45 degrees, fill light opposite side, and subtle rim light. CRITICAL: Clean seamless light grey studio backdrop (RGB 211, 211, 211) with NO windows, NO walls, NO architectural elements, NO environmental details - just plain seamless backdrop. Color temperature 5500K, high-key lighting setup maintaining exact same brightness and shadow falloff across all images. Model positioned center frame with even illumination. NEGATIVE PROMPT: No windows, no wall details, no interior elements, no background variations.';
 
 const AccordionSection = ({ id, title, isComplete, children, openSection, setOpenSection, thumbnail }) => (
   <div className={cn(
