@@ -6,6 +6,7 @@ import { a } from '@aws-amplify/backend';
  * styles, or compositions using their own reference images.
  */
 export const CustomModel = a.model({
+  customer_id: a.string().required(),  // FK to Customer
   name: a.string().required(),
   description: a.string(),
   type: a.enum(['pose', 'style', 'composition']),

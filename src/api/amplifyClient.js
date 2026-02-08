@@ -14,6 +14,35 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 const urlCache = new Map();
 const URL_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
+// Current customer context - set after login by CustomerContext
+let _currentCustomerId = null;
+let _currentUserProfileId = null;
+
+// Set the current customer context (called from CustomerContext)
+export const setCustomerContext = (customerId, userProfileId) => {
+  _currentCustomerId = customerId;
+  _currentUserProfileId = userProfileId;
+};
+
+// Get current customer ID
+export const getCurrentCustomerId = () => _currentCustomerId;
+export const getCurrentUserProfileId = () => _currentUserProfileId;
+
+// Models that require customer_id filtering
+const CUSTOMER_SCOPED_MODELS = [
+  'GeneratedImage',
+  'Garment',
+  'Model',
+  'Collection',
+  'BatchJob',
+  'Template',
+  'BrandSeed',
+  'CustomModel',
+  'ActivityLog',
+  'UsageCost',
+  'InviteLink',
+];
+
 // Helper to get a fresh signed URL from an S3 path or existing URL
 export const getSignedUrl = async (pathOrUrl) => {
   if (!pathOrUrl) return null;
@@ -152,12 +181,34 @@ const createEntityAPI = (modelName) => {
     return model;
   };
 
+  // Check if this model should be filtered by customer_id
+  const isCustomerScoped = CUSTOMER_SCOPED_MODELS.includes(modelName);
+
+  // Build customer filter for list/filter operations
+  const buildCustomerFilter = (existingFilters = {}) => {
+    if (!isCustomerScoped || !_currentCustomerId) {
+      return existingFilters;
+    }
+    return {
+      ...existingFilters,
+      customer_id: { eq: _currentCustomerId },
+    };
+  };
+
   return {
     list: async () => {
       try {
         const model = getModel();
         if (!model) return [];
-        const { data, errors } = await model.list();
+
+        // Apply customer filter if applicable
+        const customerFilter = buildCustomerFilter();
+        const hasFilter = Object.keys(customerFilter).length > 0;
+
+        const { data, errors } = hasFilter
+          ? await model.list({ filter: customerFilter })
+          : await model.list();
+
         if (errors) {
           if (isAuthError({ errors })) {
             console.warn(`${modelName}.list: User not authenticated, returning empty list`);
@@ -186,8 +237,17 @@ const createEntityAPI = (modelName) => {
         delete filteredFilters.created_by;
         delete filteredFilters.owner;
 
-        // If no filters left, just list all (owner-filtered automatically)
-        if (Object.keys(filteredFilters).length === 0) {
+        // Convert remaining filters to Amplify filter format
+        const filterConditions = {};
+        Object.entries(filteredFilters).forEach(([key, value]) => {
+          filterConditions[key] = { eq: value };
+        });
+
+        // Apply customer filter
+        const finalFilter = buildCustomerFilter(filterConditions);
+
+        // If no filters, just list all (still applies customer filter)
+        if (Object.keys(finalFilter).length === 0) {
           const { data, errors } = await model.list();
           if (errors) {
             if (isAuthError({ errors })) {
@@ -199,13 +259,7 @@ const createEntityAPI = (modelName) => {
           return data;
         }
 
-        // Convert remaining filters to Amplify filter format
-        const filterConditions = {};
-        Object.entries(filteredFilters).forEach(([key, value]) => {
-          filterConditions[key] = { eq: value };
-        });
-
-        const { data, errors } = await model.list({ filter: filterConditions });
+        const { data, errors } = await model.list({ filter: finalFilter });
         if (errors) {
           if (isAuthError({ errors })) {
             console.warn(`${modelName}.filter: User not authenticated, returning empty list`);
@@ -239,7 +293,7 @@ const createEntityAPI = (modelName) => {
       // Sanitize input - remove undefined values
       // Also stringify JSON fields that might have complex objects
       const sanitizedInput = {};
-      const jsonFields = ['ai_analysis', 'metadata', 'configuration'];
+      const jsonFields = ['ai_analysis', 'metadata', 'configuration', 'permissions'];
 
       for (const [key, value] of Object.entries(input)) {
         if (value === undefined || value === null) {
@@ -251,6 +305,11 @@ const createEntityAPI = (modelName) => {
         } else {
           sanitizedInput[key] = value;
         }
+      }
+
+      // Auto-inject customer_id for customer-scoped models
+      if (isCustomerScoped && _currentCustomerId && !sanitizedInput.customer_id) {
+        sanitizedInput.customer_id = _currentCustomerId;
       }
 
       const { data, errors } = await model.create(sanitizedInput);
@@ -529,13 +588,17 @@ const appLogs = {
 export const base44 = {
   auth: authMethods,
   entities: {
+    // Multi-tenant entities
+    Customer: createEntityAPI('Customer'),
+    UserProfile: createEntityAPI('UserProfile'),
+    UsageCost: createEntityAPI('UsageCost'),
+    InviteLink: createEntityAPI('InviteLink'),
+    // Content entities
     GeneratedImage: createEntityAPI('GeneratedImage'),
     Garment: createEntityAPI('Garment'),
     Model: createEntityAPI('Model'),
     Collection: createEntityAPI('Collection'),
     BatchJob: createEntityAPI('BatchJob'),
-    Subscription: createEntityAPI('UserSubscription'),  // Renamed: 'Subscription' is reserved in GraphQL
-    UserSubscription: createEntityAPI('UserSubscription'),
     Template: createEntityAPI('Template'),
     BrandSeed: createEntityAPI('BrandSeed'),
     CustomModel: createEntityAPI('CustomModel'),

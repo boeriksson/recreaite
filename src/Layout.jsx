@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/amplifyClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useCustomer } from '@/lib/CustomerContext';
 import {
   Shirt,
   Image,
@@ -30,40 +31,11 @@ import FloatingGenerationBar from './components/generation/FloatingGenerationBar
 
 export default function Layout({ children, currentPageName }) {
   const { user, isAuthenticated, logout } = useAuth();
+  const { customer, refreshCustomerData } = useCustomer();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
-  const [subscription, setSubscription] = useState(null);
-
-  // Load subscription when user changes
-  useEffect(() => {
-    const loadSubscription = async () => {
-      if (!isAuthenticated || !user) {
-        setSubscription(null);
-        return;
-      }
-
-      try {
-        // Load subscription
-        const subs = await base44.entities.Subscription.filter({ created_by: user.email });
-        if (subs.length > 0) {
-          setSubscription(subs[0]);
-        } else {
-          // Create free subscription
-          const newSub = await base44.entities.Subscription.create({
-            plan: 'free',
-            images_generated: 0,
-            images_limit: 10
-          });
-          setSubscription(newSub);
-        }
-      } catch (error) {
-        console.error('Failed to load subscription:', error);
-      }
-    };
-    loadSubscription();
-  }, [user, isAuthenticated]);
 
   const navItems = [
     { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -167,7 +139,7 @@ export default function Layout({ children, currentPageName }) {
                         {user.full_name || user.email}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
-                        {subscription?.plan.toUpperCase()} · {subscription?.images_generated || 0}/{subscription?.images_limit === -1 ? '∞' : subscription?.images_limit} bilder
+                        {(customer?.plan || 'free').toUpperCase()} · {customer?.images_generated_this_month || 0}/{customer?.images_limit_monthly === -1 ? '∞' : (customer?.images_limit_monthly || 100)} bilder
                       </p>
                     </div>
                     <DropdownMenuSeparator className={darkMode ? "bg-white/10" : "bg-black/10"} />
@@ -308,22 +280,22 @@ export default function Layout({ children, currentPageName }) {
         />
       )}
 
-      {showPricing && user && (
+      {showPricing && user && customer && (
         <PricingModal
           onClose={() => setShowPricing(false)}
           onSelectPlan={async (planId) => {
-            const limits = { free: 10, starter: 100, pro: 500, unlimited: -1 };
-            await base44.entities.Subscription.update(subscription.id, {
+            const limits = { free: 100, starter: 500, pro: 2000, enterprise: -1 };
+            await base44.entities.Customer.update(customer.id, {
               plan: planId,
-              images_limit: limits[planId],
-              images_generated: 0,
-              period_start: new Date().toISOString(),
-              period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+              images_limit_monthly: limits[planId],
+              images_generated_this_month: 0,
+              plan_started_at: new Date().toISOString(),
+              plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
             });
             setShowPricing(false);
-            window.location.reload();
+            await refreshCustomerData();
           }}
-          currentPlan={subscription?.plan}
+          currentPlan={customer?.plan}
           darkMode={darkMode}
         />
       )}

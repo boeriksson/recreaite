@@ -6,6 +6,7 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { CustomerProvider } from '@/lib/CustomerContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AmplifyAuth from '@/components/auth/AmplifyAuth';
 import { LanguageProvider } from '@/components/LanguageContext';
@@ -70,16 +71,18 @@ function App() {
 
   return (
     <AuthProvider>
-      <LanguageProvider>
-        <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <NavigationTracker />
-            <AuthenticatedApp />
-          </Router>
-          <Toaster />
-          <AmplifyAuth />
-        </QueryClientProvider>
-      </LanguageProvider>
+      <CustomerProvider>
+        <LanguageProvider>
+          <QueryClientProvider client={queryClientInstance}>
+            <Router>
+              <NavigationTracker />
+              <AuthenticatedApp />
+            </Router>
+            <Toaster />
+            <AmplifyAuth />
+          </QueryClientProvider>
+        </LanguageProvider>
+      </CustomerProvider>
     </AuthProvider>
   )
 }
