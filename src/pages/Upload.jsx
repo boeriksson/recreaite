@@ -149,6 +149,7 @@ export default function Upload() {
   const [currentGeneratedImageId, setCurrentGeneratedImageId] = useState(null); // Store the ID of the GeneratedImage entity
   const [lastPrompt, setLastPrompt] = useState('');
   const [selectedGarments, setSelectedGarments] = useState([]);
+  const [aiStylistSelected, setAiStylistSelected] = useState(false);
   const [batchGarments, setBatchGarments] = useState([]);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
@@ -156,7 +157,17 @@ export default function Upload() {
   const [showInfo, setShowInfo] = useState(false);
   const [savedAnalysis, setSavedAnalysis] = useState(null);
   const [showBatchJobCreator, setShowBatchJobCreator] = useState(false);
-  const [aiStylistSelected, setAiStylistSelected] = useState(false);
+
+  // Set default open section based on mode
+  React.useEffect(() => {
+    if (mode === 'style') {
+      setOpenSection('ai-styling');
+    } else if (mode === 'batch') {
+      setOpenSection('batch-garments');
+    } else {
+      setOpenSection('upload');
+    }
+  }, [mode]);
 
   // Load garment or template from URL parameter
   React.useEffect(() => {
@@ -944,7 +955,7 @@ export default function Upload() {
               mode === 'style' ? "bg-[#392599] text-white" : "bg-[#f5f5f7] text-black/60 dark:bg-white/5 dark:text-white/60"
             )}
           >
-            Style
+            AI Styling
           </button>
           <button
             onClick={() => setMode('expert')}
@@ -1033,66 +1044,95 @@ export default function Upload() {
             </>
           )}
 
-          {/* Style Mode: Select Multiple Garments */}
+          {/* Style Mode: AI Styling and Manual Selection */}
           {mode === 'style' && (
-            <AccordionSection id="garments" title="1. Välj plagg att kombinera" isComplete={selectedGarments.length >= 2} openSection={openSection} setOpenSection={setOpenSection}>
-              <div className="space-y-4">
-                <p className="text-sm text-black/60 dark:text-white/60">Välj minst 2 plagg att kombinera i en stil</p>
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                  {allGarments.map((garment) => {
-                    const isSelected = selectedGarments.some(g => g.id === garment.id);
-                    return (
-                      <button
-                        key={garment.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedGarments(selectedGarments.filter(g => g.id !== garment.id));
-                          } else {
-                            setSelectedGarments([...selectedGarments, garment]);
-                          }
-                        }}
-                        className={cn(
-                          "aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all relative",
-                          isSelected ? "border-[#392599] ring-2 ring-[#392599]/20" : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+            <>
+              <AccordionSection
+                id="ai-styling"
+                title={selectedGarments.length >= 2 && aiStylistSelected ? `1. ${t.aiStyling || 'AI Styling'} (${selectedGarments.length} plagg)` : `1. ${t.aiStyling || 'AI Styling'}`}
+                isComplete={selectedGarments.length >= 2 && aiStylistSelected}
+                openSection={openSection}
+                setOpenSection={setOpenSection}
+                thumbnail={selectedGarments.length > 0 && aiStylistSelected ? (
+                  <div className="w-full h-full flex items-center justify-center gap-0.5 bg-[#392599]/10">
+                    {selectedGarments.slice(0, 2).map((g, idx) => (
+                      <SignedImage key={idx} src={g.image_url} alt={g.name} className="w-1/2 h-full object-cover" />
+                    ))}
+                  </div>
+                ) : null}
+              >
+                <AIStylist
+                  allGarments={allGarments}
+                  brandSeed={selectedSeed}
+                  onSelectOutfit={(garments) => {
+                    setSelectedGarments(garments);
+                    setAiStylistSelected(true);
+                    setOpenSection('model');
+                  }}
+                  initialSelectedGarments={selectedGarments}
+                />
+              </AccordionSection>
+
+              <AccordionSection id="manual-garments" title={`2. ${t.selectGarmentsManually || 'Välj plagg manuellt'}`} isComplete={selectedGarments.length >= 2 && !aiStylistSelected} openSection={openSection} setOpenSection={setOpenSection}>
+                <div className="space-y-4">
+                  <p className="text-sm text-black/60 dark:text-white/60">{language === 'sv' ? 'Välj minst 2 plagg att kombinera' : 'Select at least 2 garments to combine'}</p>
+                  <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                    {allGarments.map((garment) => {
+                      const isSelected = selectedGarments.some(g => g.id === garment.id);
+                      return (
+                        <button
+                          key={garment.id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedGarments(selectedGarments.filter(g => g.id !== garment.id));
+                            } else {
+                              setSelectedGarments([...selectedGarments, garment]);
+                            }
+                            setAiStylistSelected(false);
+                          }}
+                          className={cn(
+                            "aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all relative",
+                            isSelected ? "border-[#392599] ring-2 ring-[#392599]/20" : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
                           )}
-                          >
+                        >
                           {garment.image_url ? (
-                          <SignedImage src={garment.image_url} alt={garment.name} className="w-full h-full object-cover" />
+                            <SignedImage src={garment.image_url} alt={garment.name} className="w-full h-full object-cover" />
                           ) : (
-                          <div className="w-full h-full bg-[#f5f5f7] dark:bg-white/5 flex items-center justify-center">
-                            <Shirt className="h-6 w-6 text-black/20 dark:text-white/20" />
-                          </div>
+                            <div className="w-full h-full bg-[#f5f5f7] dark:bg-white/5 flex items-center justify-center">
+                              <Shirt className="h-6 w-6 text-black/20 dark:text-white/20" />
+                            </div>
                           )}
                           {isSelected && (
-                          <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-[#392599] flex items-center justify-center">
-                            <Check className="h-4 w-4 text-white" />
+                            <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-[#392599] flex items-center justify-center">
+                              <Check className="h-4 w-4 text-white" />
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <p className="text-xs text-white truncate">{garment.name}</p>
                           </div>
-                        )}
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                          <p className="text-xs text-white truncate">{garment.name}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {selectedGarments.length > 0 && (
-                  <div className="p-3 bg-[#392599]/10 rounded-lg">
-                    <p className="text-sm text-black dark:text-white">
-                      <span className="font-medium">{selectedGarments.length} plagg valda:</span>{' '}
-                      {selectedGarments.map(g => g.name).join(', ')}
-                    </p>
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-                <Button
-                  onClick={() => setOpenSection('model')}
-                  disabled={selectedGarments.length < 2}
-                  variant="outline"
-                  className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
-                >
-                  Fortsätt
-                </Button>
-              </div>
-            </AccordionSection>
+                  {selectedGarments.length > 0 && (
+                    <div className="p-3 bg-[#392599]/10 rounded-lg">
+                      <p className="text-sm text-black dark:text-white">
+                        <span className="font-medium">{selectedGarments.length} plagg valda:</span>{' '}
+                        {selectedGarments.map(g => g.name).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => setOpenSection('model')}
+                    disabled={selectedGarments.length < 2}
+                    variant="outline"
+                    className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+                  >
+                    {language === 'sv' ? 'Fortsätt' : 'Continue'}
+                  </Button>
+                </div>
+              </AccordionSection>
+            </>
           )}
 
           {/* Upload Section */}
