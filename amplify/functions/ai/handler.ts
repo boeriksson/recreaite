@@ -105,17 +105,42 @@ export const handler = async (event: LambdaEvent): Promise<unknown> => {
         contents = parts;
       }
 
-      // Use Gemini 3 Pro Image model (Nano Banana Pro) for high-quality image generation
-      const response = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview',
-        contents: contents,
-        config: {
-          responseModalities: ['Text', 'Image'],
-          imageConfig: {
-            imageSize: '1K',
-          },
-        },
-      }));
+      // Try Nano Banana Pro first, fall back to Flash if it fails
+      console.log('Contents type:', typeof contents, 'is array:', Array.isArray(contents));
+      if (Array.isArray(contents)) {
+        console.log('Contents parts:', contents.length, 'has images:', contents.some((p: any) => p.inlineData));
+      }
+
+      let response;
+      const models = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'];
+
+      for (const modelName of models) {
+        try {
+          console.log(`Trying model: ${modelName}`);
+          response = await withRetry(() => ai.models.generateContent({
+            model: modelName,
+            contents: contents,
+            config: {
+              responseModalities: ['TEXT', 'IMAGE'],
+            },
+          }), 1); // Only 1 retry per model before trying next
+
+          // Check if we got an image
+          if (response.candidates?.[0]?.content?.parts?.some((p: any) => p.inlineData?.data)) {
+            console.log(`Success with model: ${modelName}`);
+            break;
+          } else {
+            console.log(`Model ${modelName} returned no image, trying next...`);
+          }
+        } catch (modelError: any) {
+          console.log(`Model ${modelName} failed: ${modelError.message}`);
+          if (modelName === models[models.length - 1]) {
+            throw modelError; // Re-throw if last model fails
+          }
+        }
+      }
+
+      console.log('Gemini raw response keys:', Object.keys(response || {}));
 
       // Log response summary (not full data to avoid huge logs)
       console.log('Gemini response received, candidates:', response.candidates?.length || 0);

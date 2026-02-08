@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { base44 } from '@/api/amplifyClient';
+import { base44, getSignedUrl } from '@/api/amplifyClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -502,9 +502,12 @@ export default function Upload() {
 
         const prompt = `${modelPrompt} wearing the garment in the reference image. High-quality product photography, professional lighting. ${seedPrompt}${envPrompt}`;
 
+        // Sign the garment URL for the Lambda to fetch
+        const signedGarmentUrl = await getSignedUrl(garment.image_url);
+
         const result = await base44.integrations.Core.GenerateImage({
           prompt: `${prompt} 4:5 aspect ratio, portrait orientation.`,
-          existing_image_urls: [garment.image_url]
+          existing_image_urls: [signedGarmentUrl]
         });
 
         await createGeneratedImageMutation.mutateAsync({
@@ -749,16 +752,22 @@ export default function Upload() {
       (async () => {
         const TIMEOUT = 5 * 60 * 1000; // 5 minutes
         let timeoutId;
-        
+
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error('Generation timeout')), TIMEOUT);
         });
 
         try {
+          // Sign all S3 URLs before sending to Lambda
+          const signedImageUrls = await Promise.all(
+            imageUrls.map(url => getSignedUrl(url))
+          );
+          console.log('Signed image URLs for generation:', signedImageUrls.length);
+
           const generateWithTimeout = async () => {
             const result = await base44.integrations.Core.GenerateImage({
               prompt: `${prompt} 4:5 aspect ratio, portrait orientation.`,
-              existing_image_urls: imageUrls
+              existing_image_urls: signedImageUrls
             });
 
             console.log('Updating full-body image record:', newImage.id);
@@ -819,10 +828,13 @@ export default function Upload() {
             // Generate lay-flat version
             if (layFlatImage) {
               const layFlatPrompt = 'Professional product photography. Garment from reference image laid flat on light grey background (RGB 211, 211, 211). Top-down view, perfectly centered. Garment is neatly arranged and pressed flat. Studio lighting with soft shadows. Clean, minimal product shot. Same exact garment colors and details as reference. 4:5 aspect ratio, portrait orientation.';
-              
+
+              // Sign the uploaded URL for the Lambda to fetch
+              const signedUploadedUrl = await getSignedUrl(uploadedUrl);
+
               const layFlatResult = await base44.integrations.Core.GenerateImage({
                 prompt: layFlatPrompt,
-                existing_image_urls: [uploadedUrl]
+                existing_image_urls: [signedUploadedUrl]
               });
 
               console.log('Updating lay-flat image record:', layFlatImage.id);
@@ -838,18 +850,26 @@ export default function Upload() {
           clearTimeout(timeoutId);
         } catch (error) {
           clearTimeout(timeoutId);
-          console.error('Background generation failed:', error);
-          
-          // Always update status to failed, even if update fails
+          const errorMsg = error?.message || error?.toString() || 'Unknown error';
+          console.error('🔴 Background generation failed:', errorMsg, error);
+          console.error('🔴 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+
+          // Always update status to failed with error message
           try {
-            await base44.entities.GeneratedImage.update(newImage.id, { status: 'failed' });
+            await base44.entities.GeneratedImage.update(newImage.id, {
+              status: 'failed',
+              prompt_used: `ERROR: ${errorMsg}\n\nOriginal prompt: ${newImage.prompt_used || prompt}`
+            });
           } catch (updateError) {
             console.error('Failed to update main image status:', updateError);
           }
-          
+
           if (croppedImage) {
             try {
-              await base44.entities.GeneratedImage.update(croppedImage.id, { status: 'failed' });
+              await base44.entities.GeneratedImage.update(croppedImage.id, {
+                status: 'failed',
+                prompt_used: `ERROR: ${errorMsg}`
+              });
             } catch (updateError) {
               console.error('Failed to update cropped image status:', updateError);
             }
@@ -857,7 +877,10 @@ export default function Upload() {
 
           if (layFlatImage) {
             try {
-              await base44.entities.GeneratedImage.update(layFlatImage.id, { status: 'failed' });
+              await base44.entities.GeneratedImage.update(layFlatImage.id, {
+                status: 'failed',
+                prompt_used: `ERROR: ${errorMsg}`
+              });
             } catch (updateError) {
               console.error('Failed to update lay-flat image status:', updateError);
             }

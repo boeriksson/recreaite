@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/amplifyClient';
+import { base44, getSignedUrl } from '@/api/amplifyClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import JSZip from 'jszip';
 import {
@@ -129,6 +129,9 @@ export default function Gallery() {
   const processingImages = allImages
     .filter(img => img.status === 'processing' || img.status === 'pending')
     .sort(sortByDate);
+  const failedImages = allImages
+    .filter(img => img.status === 'failed')
+    .sort(sortByDate);
   const images = allImages
     .filter(img => img.status === 'completed' && img.image_url && img.image_url !== null)
     .sort(sortByDate);
@@ -137,11 +140,15 @@ export default function Gallery() {
   React.useEffect(() => {
     console.log('Gallery: Total images:', allImages.length,
       '| Processing:', processingImages.length,
+      '| Failed:', failedImages.length,
       '| Completed:', images.length);
     if (processingImages.length > 0) {
       console.log('Processing images:', processingImages.map(img => ({ id: img.id, status: img.status })));
     }
-  }, [allImages, processingImages, images]);
+    if (failedImages.length > 0) {
+      console.log('Failed images:', failedImages.map(img => ({ id: img.id, status: img.status, prompt: img.prompt_used?.substring(0, 50) })));
+    }
+  }, [allImages, processingImages, failedImages, images]);
 
   const { data: garments = [] } = useQuery({
     queryKey: ['garments'],
@@ -784,6 +791,38 @@ export default function Gallery() {
             </motion.div>
           ))}
 
+          {/* Failed Images */}
+          {failedImages.map((image) => {
+            const errorMatch = image.prompt_used?.match(/^ERROR: (.+?)(\n|$)/);
+            const errorMsg = errorMatch ? errorMatch[1] : null;
+            return (
+              <motion.div
+                key={image.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="aspect-[3/4] rounded-2xl overflow-hidden bg-gradient-to-br from-red-500/20 to-red-500/10 border-2 border-red-500/30 flex items-center justify-center relative group"
+                title={errorMsg || 'Unknown error'}
+              >
+                <div className="relative z-10 text-center p-4">
+                  <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
+                    <X className="h-6 w-6 text-red-500" />
+                  </div>
+                  <p className="text-sm font-medium text-red-500">{language === 'sv' ? 'Misslyckades' : 'Failed'}</p>
+                  <p className="text-xs text-red-500/60 mt-1 line-clamp-2 max-w-[150px] mx-auto">
+                    {errorMsg || (language === 'sv' ? 'Generering kunde inte slutföras' : 'Generation could not complete')}
+                  </p>
+                </div>
+                {/* Delete button */}
+                <button
+                  onClick={() => setDeleteId(image.id)}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/40"
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </button>
+              </motion.div>
+            );
+          })}
+
           {/* Completed Images */}
           {paginatedImages.map((image, index) => {
             const garment = getGarment(image.garment_id);
@@ -1151,9 +1190,11 @@ export default function Gallery() {
                     }}
                     onGenerateImage={async (prompt, imageUrls) => {
                       const urls = Array.isArray(imageUrls) ? imageUrls : [imageUrls];
+                      // Sign all S3 URLs before sending to Lambda
+                      const signedUrls = await Promise.all(urls.map(url => getSignedUrl(url)));
                       const result = await base44.integrations.Core.GenerateImage({
                         prompt: prompt,
-                        existing_image_urls: urls
+                        existing_image_urls: signedUrls
                       });
                       return { image_url: result.url };
                     }}
