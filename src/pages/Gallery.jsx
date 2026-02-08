@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44 } from '@/api/amplifyClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import JSZip from 'jszip';
 import {
@@ -120,9 +120,19 @@ export default function Gallery() {
     return unsubscribe;
   }, [queryClient]);
 
-  // Separate processing and completed images
-  const processingImages = allImages.filter(img => img.status === 'processing' || img.status === 'pending');
-  const images = allImages.filter(img => img.status === 'completed' && img.image_url && img.image_url !== null);
+  // Separate processing and completed images, sorted by creation date (newest first)
+  const sortByDate = (a, b) => {
+    const dateA = new Date(a.created_date || a.createdAt || 0);
+    const dateB = new Date(b.created_date || b.createdAt || 0);
+    return dateB - dateA; // Newest first
+  };
+
+  const processingImages = allImages
+    .filter(img => img.status === 'processing' || img.status === 'pending')
+    .sort(sortByDate);
+  const images = allImages
+    .filter(img => img.status === 'completed' && img.image_url && img.image_url !== null)
+    .sort(sortByDate);
 
   // Debug logging
   React.useEffect(() => {
@@ -460,7 +470,9 @@ export default function Gallery() {
                   </h3>
                   <div className="flex items-center gap-1 text-sm text-black/40 dark:text-white/40 mt-1">
                     <Calendar className="h-3 w-3" />
-                    {format(new Date(image.created_date), 'd MMMM yyyy', { locale: sv })}
+                    {(image.created_date || image.createdAt)
+                      ? format(new Date(image.created_date || image.createdAt), 'd MMMM yyyy', { locale: language === 'sv' ? sv : enUS })
+                      : '-'}
                   </div>
                 </div>
               </motion.div>
@@ -789,7 +801,9 @@ export default function Gallery() {
                     <div className="flex justify-between">
                       <span className="text-black/60 dark:text-white/60">Skapad</span>
                       <span className="text-black dark:text-white">
-                        {format(new Date(infoImage.created_date), 'd MMMM yyyy', { locale: sv })}
+                        {(infoImage.created_date || infoImage.createdAt)
+                          ? format(new Date(infoImage.created_date || infoImage.createdAt), 'd MMMM yyyy', { locale: language === 'sv' ? sv : enUS })
+                          : '-'}
                       </span>
                     </div>
                     <div className="flex justify-between">

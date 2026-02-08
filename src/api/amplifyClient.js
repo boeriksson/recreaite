@@ -532,6 +532,8 @@ export const base44 = {
     GeneratedImage: createEntityAPI('GeneratedImage'),
     Garment: createEntityAPI('Garment'),
     Model: createEntityAPI('Model'),
+    Collection: createEntityAPI('Collection'),
+    BatchJob: createEntityAPI('BatchJob'),
     Subscription: createEntityAPI('UserSubscription'),  // Renamed: 'Subscription' is reserved in GraphQL
     UserSubscription: createEntityAPI('UserSubscription'),
     Template: createEntityAPI('Template'),

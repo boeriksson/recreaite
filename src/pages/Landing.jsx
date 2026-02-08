@@ -13,7 +13,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { base44 } from '@/api/base44Client';
+import { base44 } from '@/api/amplifyClient';
 import { useQuery } from '@tanstack/react-query';
 import ModelCarousel from '../components/landing/ModelCarousel';
 import BeforeAfterSlider from '../components/landing/BeforeAfterSlider';

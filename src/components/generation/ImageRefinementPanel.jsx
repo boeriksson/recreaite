@@ -20,7 +20,7 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { base44 } from '@/api/base44Client';
+import { base44 } from '@/api/amplifyClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export default function ImageRefinementPanel({ 

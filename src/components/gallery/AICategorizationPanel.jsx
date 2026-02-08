@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44 } from '@/api/amplifyClient';
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, Tag, RefreshCw } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
