@@ -6,24 +6,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  RefreshCw, 
-  Maximize2, 
-  Edit3, 
-  Loader2, 
+import {
+  RefreshCw,
+  Maximize2,
+  Edit3,
+  Loader2,
   Check,
   X,
   Save,
   Image as ImageIcon,
   Palette,
   User,
-  Lightbulb
+  Lightbulb,
+  Sparkles
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { base44 } from '@/api/amplifyClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-export default function ImageRefinementPanel({ 
+export default function ImageRefinementPanel({
   currentImage,
   currentImages, // { fullBody, framed } if dual images
   originalGeneratedImageId, // ID of the original GeneratedImage entity
@@ -59,7 +60,22 @@ export default function ImageRefinementPanel({
     queryFn: () => base44.entities.Model.list('-created_date'),
     initialData: [],
   });
-  
+
+  const { data: allGarments = [] } = useQuery({
+    queryKey: ['all-garments-refinement'],
+    queryFn: () => base44.entities.Garment.list('-created_date'),
+    initialData: [],
+  });
+
+  const { data: brandSeeds = [] } = useQuery({
+    queryKey: ['brand-seeds-refinement'],
+    queryFn: () => base44.entities.BrandSeed.list('-created_date'),
+    initialData: [],
+  });
+
+  const [styleConsistencyResult, setStyleConsistencyResult] = useState(null);
+  const [checkingConsistency, setCheckingConsistency] = useState(false);
+
   // Update working URL when currentImage prop changes
   React.useEffect(() => {
     setWorkingImageUrl(currentImage);
@@ -109,7 +125,7 @@ export default function ImageRefinementPanel({
     }
   };
 
-  const handleUpscale = async () => {
+  const handleUpscale = async (resolution = '4k') => {
     setProcessing(true);
     setGenerationProgress(0);
     onProcessingChange?.(true, 0);
@@ -121,13 +137,14 @@ export default function ImageRefinementPanel({
       });
     }, 800);
     try {
-      const upscalePrompt = `Upscale this image to ultra high resolution. 4K quality, enhanced details, professional photography sharpness, crisp focus. Maintain exact same composition, colors, and content. 4:5 aspect ratio, portrait orientation. No text, no watermarks, no labels in the image.`;
+      const resolutionLabel = resolution === '4k' ? '4K (3840x2160)' : '2K (2560x1440)';
+      const upscalePrompt = `Upscale this image to ${resolutionLabel} ultra high resolution. Enhanced details, professional photography sharpness, crisp focus. Maintain exact same composition, colors, and content. 4:5 aspect ratio, portrait orientation. No text, no watermarks, no labels in the image.`;
       const result = await onGenerateImage(upscalePrompt, [workingImageUrl]);
       if (result?.image_url) {
         const newUrl = result.image_url;
         setWorkingImageUrl(newUrl);
         onImageUpdated(newUrl);
-        await createSavedImageVersion(newUrl, upscalePrompt, 'Uppskalad');
+        await createSavedImageVersion(newUrl, upscalePrompt, `Uppskalad ${resolution.toUpperCase()}`);
       }
     } catch (error) {
       console.error('Upscale failed:', error);
@@ -216,7 +233,7 @@ export default function ImageRefinementPanel({
 
   const handleEdit = async () => {
     if (!editPrompt.trim()) return;
-    
+
     setProcessing(true);
     setGenerationProgress(0);
     onProcessingChange?.(true, 0);
@@ -295,7 +312,7 @@ export default function ImageRefinementPanel({
       const modifiedPrompt = `Use the reference images as basis. ${facePrompt}. ABSOLUTE CRITICAL REQUIREMENTS: Keep EVERYTHING from the reference image IDENTICAL - same garment with ALL details, same background, same lighting, same environment, same pose, same body position, same camera angle, same composition. ONLY change the model's face and head to match: ${facePrompt}. The garment must be exactly the same. The background must be exactly the same. The pose must be exactly the same. ONLY the face changes. 4:5 aspect ratio, portrait orientation. No text, no watermarks, no labels.`;
       const garmentRef = Array.isArray(garmentImageUrl) && garmentImageUrl.length > 0 ? garmentImageUrl[0] : (typeof garmentImageUrl === 'string' ? garmentImageUrl : null);
       const imageRefs = [workingImageUrl, garmentRef].filter(url => url && typeof url === 'string');
-      
+
       const result = await onGenerateImage(modifiedPrompt, imageRefs);
       if (result?.image_url) {
         const newUrl = result.image_url;
@@ -333,6 +350,133 @@ export default function ImageRefinementPanel({
     { label: 'Högt Kontrast', prompt: 'Increase contrast, deeper blacks and brighter highlights' },
     { label: 'Mjukt Kontrast', prompt: 'Decrease contrast, softer and more even tones throughout' },
   ];
+
+  const handleVirtualTryOn = async (garmentId, label) => {
+    setProcessing(true);
+    setGenerationProgress(0);
+    onProcessingChange?.(true, 0);
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => {
+        const newProgress = prev < 90 ? prev + 10 : prev;
+        onProcessingChange?.(true, newProgress);
+        return newProgress;
+      });
+    }, 800);
+    try {
+      const garment = allGarments.find(g => g.id === garmentId);
+      if (!garment) return;
+
+      const tryOnPrompt = `Add the garment from the new reference image to the model. The model should now be wearing both the original garment AND the new garment from the additional reference. Keep the exact same model, same background, same lighting. Only add the new garment to the outfit. Professional fashion photography. 4:5 aspect ratio, portrait orientation.`;
+      const imageRefs = [workingImageUrl, garment.image_url].filter(url => url && typeof url === 'string');
+
+      const result = await onGenerateImage(tryOnPrompt, imageRefs);
+      if (result?.image_url) {
+        const newUrl = result.image_url;
+        setWorkingImageUrl(newUrl);
+        onImageUpdated(newUrl);
+        await createSavedImageVersion(newUrl, tryOnPrompt, label);
+      }
+    } catch (error) {
+      console.error('Virtual try-on failed:', error);
+    } finally {
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+      onProcessingChange?.(true, 100);
+      setTimeout(() => {
+        setProcessing(false);
+        onProcessingChange?.(false, 0);
+      }, 300);
+    }
+  };
+
+  const handleBackgroundVariation = async (variationType, label) => {
+    setProcessing(true);
+    setGenerationProgress(0);
+    onProcessingChange?.(true, 0);
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => {
+        const newProgress = prev < 90 ? prev + 10 : prev;
+        onProcessingChange?.(true, newProgress);
+        return newProgress;
+      });
+    }, 800);
+    try {
+      let bgPrompt = '';
+      if (variationType === 'blur') {
+        bgPrompt = 'Apply a strong blur effect to the background while keeping the model and garment in sharp focus. Professional portrait photography with shallow depth of field. 4:5 aspect ratio.';
+      } else if (variationType === 'enhance') {
+        bgPrompt = 'Enhance and improve the background - make it more appealing while keeping the same general setting. Better composition, better lighting, more professional look. 4:5 aspect ratio.';
+      } else if (variationType === 'minimal') {
+        bgPrompt = 'Transform the background to a clean, minimalist setting. Simple, uncluttered, professional. Keep same lighting quality. 4:5 aspect ratio.';
+      }
+
+      const result = await onGenerateImage(bgPrompt, [workingImageUrl]);
+      if (result?.image_url) {
+        const newUrl = result.image_url;
+        setWorkingImageUrl(newUrl);
+        onImageUpdated(newUrl);
+        await createSavedImageVersion(newUrl, bgPrompt, label);
+      }
+    } catch (error) {
+      console.error('Background variation failed:', error);
+    } finally {
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+      onProcessingChange?.(true, 100);
+      setTimeout(() => {
+        setProcessing(false);
+        onProcessingChange?.(false, 0);
+      }, 300);
+    }
+  };
+
+  const checkStyleConsistency = async () => {
+    if (brandSeeds.length === 0) return;
+
+    setCheckingConsistency(true);
+    try {
+      const seed = brandSeeds[0];
+      const analysisPrompt = `Analyze this generated fashion image against the following brand guidelines:
+
+Brand: ${seed.name}
+Style: ${seed.brand_style}
+Character: ${seed.character}
+Environment: ${seed.environment}
+Color Palette: ${seed.color_palette}
+Photography Style: ${seed.photography_style}
+
+Evaluate the image on:
+1. Color consistency with brand palette
+2. Style alignment with brand character
+3. Overall brand fit
+
+Provide specific issues and suggestions for improvement.`;
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: analysisPrompt,
+        file_urls: [workingImageUrl],
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            overall_score: { type: 'number', description: 'Score from 1-10' },
+            color_consistency: { type: 'boolean' },
+            style_consistency: { type: 'boolean' },
+            brand_alignment: { type: 'boolean' },
+            summary: { type: 'string' },
+            issues: { type: 'array', items: { type: 'string' } },
+            suggestions: { type: 'array', items: { type: 'string' } }
+          }
+        }
+      });
+
+      setStyleConsistencyResult(result);
+    } catch (error) {
+      console.error('Style consistency check failed:', error);
+      setStyleConsistencyResult({ error: 'Kunde inte analysera. Försök igen.' });
+    } finally {
+      setCheckingConsistency(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -377,7 +521,7 @@ export default function ImageRefinementPanel({
           )}
           {showAdvanced ? 'Stäng redigering' : 'Redigera bild'}
         </Button>
-        
+
         <div className="grid grid-cols-2 gap-2">
           <Button
             onClick={handleSave}
@@ -421,22 +565,42 @@ export default function ImageRefinementPanel({
           >
             <div className="rounded-xl bg-white dark:bg-[#1a1a1a] border border-black/10 dark:border-white/10 overflow-hidden">
               <Tabs defaultValue="versions" className="w-full">
-                <TabsList className="w-full grid grid-cols-4 bg-[#f5f5f7] dark:bg-white/5 border-b border-black/10 dark:border-white/10 rounded-none h-12">
-                  <TabsTrigger value="versions" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-2">
+                <TabsList className="w-full grid grid-cols-9 bg-[#f5f5f7] dark:bg-white/5 border-b border-black/10 dark:border-white/10 rounded-none h-12 text-xs">
+                  <TabsTrigger value="versions" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
                     <Lightbulb className="h-4 w-4" />
                     <span className="hidden sm:inline">Versioner</span>
                   </TabsTrigger>
-                  <TabsTrigger value="background" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-2">
+                  <TabsTrigger value="upscale" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
+                    <Maximize2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Upscale</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="variation" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="hidden sm:inline">AI Variation</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="background" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
                     <ImageIcon className="h-4 w-4" />
                     <span className="hidden sm:inline">Bakgrund</span>
                   </TabsTrigger>
-                  <TabsTrigger value="pose" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-2">
+                  <TabsTrigger value="pose" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">Pose</span>
                   </TabsTrigger>
-                  <TabsTrigger value="face" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-2">
+                  <TabsTrigger value="face" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">Ansikte</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="tryon" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="hidden sm:inline">Try-On</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="bg-ai" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
+                    <Palette className="h-4 w-4" />
+                    <span className="hidden sm:inline">BG AI</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="consistency" className="data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 gap-1 px-2">
+                    <Check className="h-4 w-4" />
+                    <span className="hidden sm:inline">Check</span>
                   </TabsTrigger>
                 </TabsList>
 
@@ -445,7 +609,7 @@ export default function ImageRefinementPanel({
                     <p className="text-sm text-black/60 dark:text-white/60 mb-3">Tidigare versioner:</p>
                     <div className="flex flex-wrap gap-2">
                       {originalGeneratedImageId && (
-                        <div 
+                        <div
                           className={cn(
                             "w-20 h-20 rounded-md overflow-hidden border-2 cursor-pointer",
                             activeVersionId === originalGeneratedImageId ? "border-[#392599]" : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
@@ -467,6 +631,192 @@ export default function ImageRefinementPanel({
                           <SignedImage src={version.image_url} alt={version.notes} className="w-full h-full object-cover" />
                         </div>
                       ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="upscale" className="mt-0 space-y-3">
+                    <p className="text-sm text-black/60 dark:text-white/60 mb-3">Förbättra bildkvaliteten</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        onClick={() => handleUpscale('2k')}
+                        disabled={processing}
+                        className="bg-[#392599] hover:bg-[#4a2fb3] text-white h-auto py-4 flex flex-col gap-2"
+                      >
+                        <Maximize2 className="h-6 w-6" />
+                        <div>
+                          <div className="font-semibold">2K Upscale</div>
+                          <div className="text-xs opacity-80">2560x1440px</div>
+                        </div>
+                      </Button>
+                      <Button
+                        onClick={() => handleUpscale('4k')}
+                        disabled={processing}
+                        className="bg-[#392599] hover:bg-[#4a2fb3] text-white h-auto py-4 flex flex-col gap-2"
+                      >
+                        <Maximize2 className="h-6 w-6" />
+                        <div>
+                          <div className="font-semibold">4K Upscale</div>
+                          <div className="text-xs opacity-80">3840x2160px</div>
+                        </div>
+                      </Button>
+                    </div>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-2">
+                      Förbättrar detaljer och skärpa för högupplösta utskrifter och visningar
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="variation" className="mt-0 space-y-3">
+                    <p className="text-sm text-black/60 dark:text-white/60 mb-3">AI-drivna variationer</p>
+
+                    {/* Expression & Pose Variations */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-black dark:text-white">Uttryck & Poser</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => handleQuickEdit('Generate same model with different natural facial expression - could be smiling, neutral, or subtle emotion. Keep everything else identical', 'Variera uttryck', true)}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Variera uttryck
+                        </Button>
+                        <Button
+                          onClick={() => handleQuickEdit('Generate 3 different natural poses with the same model - standing, sitting, dynamic. Keep model and garment identical', 'Variera pose', true)}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          3 olika poser
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Similar Face, Different Demographics */}
+                    <div className="space-y-2 mt-4">
+                      <p className="text-xs font-medium text-black dark:text-white">Demografiska variationer</p>
+                      <p className="text-xs text-black/50 dark:text-white/50 mb-2">Behåll liknande ansiktsdrag men variera kön/etnicitet</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => handleFaceChange('A male model with similar facial structure, age, and overall look as the reference, but masculine features. Keep the same friendly and professional expression', 'Samma drag, man')}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Manlig version
+                        </Button>
+                        <Button
+                          onClick={() => handleFaceChange('A female model with similar facial structure, age, and overall look as the reference, but feminine features. Keep the same friendly and professional expression', 'Samma drag, kvinna')}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Kvinnlig version
+                        </Button>
+                        <Button
+                          onClick={() => handleFaceChange('An Asian model with similar facial structure, age, and overall look as the reference. Keep the same friendly and professional expression', 'Asiatisk variant')}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Asiatisk
+                        </Button>
+                        <Button
+                          onClick={() => handleFaceChange('An African model with similar facial structure, age, and overall look as the reference. Keep the same friendly and professional expression', 'Afrikansk variant')}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Afrikansk
+                        </Button>
+                        <Button
+                          onClick={() => handleFaceChange('A Hispanic/Latino model with similar facial structure, age, and overall look as the reference. Keep the same friendly and professional expression', 'Latinamerikansk variant')}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Latinamerikansk
+                        </Button>
+                        <Button
+                          onClick={() => handleFaceChange('A Middle Eastern model with similar facial structure, age, and overall look as the reference. Keep the same friendly and professional expression', 'Mellanöstern variant')}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                        >
+                          Mellanöstern
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Multi-Garment AI Styling */}
+                    <div className="space-y-2 mt-4">
+                      <p className="text-xs font-medium text-black dark:text-white">AI Multi-garment Styling</p>
+                      <p className="text-xs text-black/50 dark:text-white/50 mb-2">AI väljer kompletterande plagg automatiskt</p>
+                      <Button
+                        onClick={async () => {
+                          setProcessing(true);
+                          setGenerationProgress(0);
+                          onProcessingChange?.(true, 0);
+                          const progressInterval = setInterval(() => {
+                            setGenerationProgress(prev => {
+                              const newProgress = prev < 90 ? prev + 10 : prev;
+                              onProcessingChange?.(true, newProgress);
+                              return newProgress;
+                            });
+                          }, 800);
+                          try {
+                            const analysis = await base44.integrations.Core.InvokeLLM({
+                              prompt: 'Analyze this garment and suggest 2-3 complementary garment types that would complete a stylish outfit (e.g., if showing a jacket, suggest shirt and pants). Return garment categories only.',
+                              file_urls: Array.isArray(garmentImageUrl) ? garmentImageUrl : [garmentImageUrl],
+                              response_json_schema: {
+                                type: 'object',
+                                properties: {
+                                  suggested_categories: { type: 'array', items: { type: 'string' }, description: 'List of garment categories like tops, bottoms, dresses, outerwear, accessories' }
+                                }
+                              }
+                            });
+
+                            const matchingGarments = allGarments.filter(g =>
+                              analysis.suggested_categories.some(cat =>
+                                g.category && g.category.toLowerCase().includes(cat.toLowerCase())
+                              )
+                            ).slice(0, 2);
+
+                            if (matchingGarments.length > 0) {
+                              const allGarmentUrls = [
+                                ...(Array.isArray(garmentImageUrl) ? garmentImageUrl : [garmentImageUrl]),
+                                ...matchingGarments.map(g => g.image_url)
+                              ];
+
+                              const stylePrompt = `Create a complete styled outfit with the model wearing ALL these garments together. Professional fashion photography showing a cohesive, well-styled look. 4:5 aspect ratio. Keep the same model features.`;
+                              const result = await onGenerateImage(stylePrompt, allGarmentUrls);
+
+                              if (result?.image_url) {
+                                setWorkingImageUrl(result.image_url);
+                                onImageUpdated(result.image_url);
+                                await createSavedImageVersion(result.image_url, stylePrompt, 'AI Multi-garment');
+                              }
+                            }
+                          } catch (error) {
+                            console.error('AI styling failed:', error);
+                          } finally {
+                            clearInterval(progressInterval);
+                            setGenerationProgress(100);
+                            onProcessingChange?.(true, 100);
+                            setTimeout(() => {
+                              setProcessing(false);
+                              onProcessingChange?.(false, 0);
+                            }, 300);
+                          }
+                        }}
+                        disabled={processing || allGarments.length < 2}
+                        className="w-full bg-[#392599] hover:bg-[#4a2fb3] text-white"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        AI väljer kompletterande plagg
+                      </Button>
+                      {allGarments.length < 2 && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">Ladda upp fler plagg för AI-styling</p>
+                      )}
                     </div>
                   </TabsContent>
 
@@ -506,7 +856,7 @@ export default function ImageRefinementPanel({
 
                   <TabsContent value="face" className="mt-0 space-y-3">
                     <p className="text-sm text-black/60 dark:text-white/60 mb-3">Byt modellens ansikte</p>
-                    
+
                     {/* Predefined face options */}
                     <div className="grid grid-cols-2 gap-2">
                       {faceOptions.map((option) => (
@@ -536,8 +886,8 @@ export default function ImageRefinementPanel({
                               className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3 flex items-center gap-2"
                             >
                               {(model.portrait_url || model.image_url) && (
-                                <img 
-                                  src={model.portrait_url || model.image_url} 
+                                <SignedImage
+                                  src={model.portrait_url || model.image_url}
                                   alt={model.name}
                                   className="w-6 h-6 rounded-full object-cover"
                                 />
@@ -547,6 +897,172 @@ export default function ImageRefinementPanel({
                           ))}
                         </div>
                       </>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="tryon" className="mt-0 space-y-3">
+                    <p className="text-sm text-black/60 dark:text-white/60 mb-3">Lägg till accessoarer eller andra plagg virtuellt</p>
+
+                    <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                      {allGarments.map((garment) => (
+                        <Button
+                          key={garment.id}
+                          onClick={() => handleVirtualTryOn(garment.id, `Try-on: ${garment.name}`)}
+                          disabled={processing}
+                          variant="outline"
+                          className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3 flex items-center gap-2"
+                        >
+                          {garment.image_url && (
+                            <SignedImage
+                              src={garment.image_url}
+                              alt={garment.name}
+                              className="w-8 h-8 rounded object-cover flex-shrink-0"
+                            />
+                          )}
+                          <span className="truncate text-left flex-1">{garment.name}</span>
+                        </Button>
+                      ))}
+                    </div>
+
+                    {allGarments.length === 0 && (
+                      <div className="text-center py-8 text-black/40 dark:text-white/40">
+                        Inga plagg tillgängliga. Ladda upp plagg först.
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="bg-ai" className="mt-0 space-y-3">
+                    <p className="text-sm text-black/60 dark:text-white/60 mb-3">AI-driven bakgrundsförbättring</p>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => handleBackgroundVariation('blur', 'Bakgrund: Blur')}
+                        disabled={processing}
+                        variant="outline"
+                        className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                      >
+                        Blur Bakgrund
+                      </Button>
+                      <Button
+                        onClick={() => handleBackgroundVariation('enhance', 'Bakgrund: Förbättrad')}
+                        disabled={processing}
+                        variant="outline"
+                        className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                      >
+                        Förbättra Bakgrund
+                      </Button>
+                      <Button
+                        onClick={() => handleBackgroundVariation('minimal', 'Bakgrund: Minimal')}
+                        disabled={processing}
+                        variant="outline"
+                        className="border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-[#392599]/10 hover:border-[#392599] justify-start h-auto py-3"
+                      >
+                        Minimalistisk
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="consistency" className="mt-0 space-y-3">
+                    <p className="text-sm text-black/60 dark:text-white/60 mb-3">Kontrollera mot varumärkesriktlinjer</p>
+
+                    {!styleConsistencyResult && !checkingConsistency && (
+                      <Button
+                        onClick={checkStyleConsistency}
+                        disabled={brandSeeds.length === 0}
+                        className="w-full bg-[#392599] hover:bg-[#4a2fb3] text-white"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Kontrollera Stilkonsistens
+                      </Button>
+                    )}
+
+                    {checkingConsistency && (
+                      <div className="text-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#392599]" />
+                        <p className="text-sm text-black/60 dark:text-white/60">Analyserar mot brand seed...</p>
+                      </div>
+                    )}
+
+                    {styleConsistencyResult && !styleConsistencyResult.error && (
+                      <div className="space-y-3">
+                        <div className={cn(
+                          "p-4 rounded-lg border",
+                          styleConsistencyResult.overall_score >= 7 ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/30" : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/30"
+                        )}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-black dark:text-white">Poäng</span>
+                            <span className="text-2xl font-bold text-black dark:text-white">{styleConsistencyResult.overall_score}/10</span>
+                          </div>
+                          <p className="text-xs text-black/60 dark:text-white/60">{styleConsistencyResult.summary}</p>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className={cn("p-2 rounded", styleConsistencyResult.color_consistency ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")}>
+                            <p className="font-medium text-black dark:text-white">Färg</p>
+                            <p className={styleConsistencyResult.color_consistency ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}>
+                              {styleConsistencyResult.color_consistency ? "OK" : "Ej OK"}
+                            </p>
+                          </div>
+                          <div className={cn("p-2 rounded", styleConsistencyResult.style_consistency ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")}>
+                            <p className="font-medium text-black dark:text-white">Stil</p>
+                            <p className={styleConsistencyResult.style_consistency ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}>
+                              {styleConsistencyResult.style_consistency ? "OK" : "Ej OK"}
+                            </p>
+                          </div>
+                          <div className={cn("p-2 rounded", styleConsistencyResult.brand_alignment ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")}>
+                            <p className="font-medium text-black dark:text-white">Varumärke</p>
+                            <p className={styleConsistencyResult.brand_alignment ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}>
+                              {styleConsistencyResult.brand_alignment ? "OK" : "Ej OK"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {styleConsistencyResult.issues && styleConsistencyResult.issues.length > 0 && (
+                          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                            <p className="text-xs font-medium text-red-800 dark:text-red-200 mb-2">Problem:</p>
+                            <ul className="text-xs text-red-700 dark:text-red-300 space-y-1">
+                              {styleConsistencyResult.issues.map((issue, idx) => (
+                                <li key={idx}>- {issue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {styleConsistencyResult.suggestions && styleConsistencyResult.suggestions.length > 0 && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                            <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-2">Förslag:</p>
+                            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                              {styleConsistencyResult.suggestions.map((suggestion, idx) => (
+                                <li key={idx}>- {suggestion}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={() => setStyleConsistencyResult(null)}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-black/10 dark:border-white/10"
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Kör om analys
+                        </Button>
+                      </div>
+                    )}
+
+                    {styleConsistencyResult?.error && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-lg">
+                        <p className="text-sm text-amber-800 dark:text-amber-200">{styleConsistencyResult.error}</p>
+                      </div>
+                    )}
+
+                    {brandSeeds.length === 0 && !styleConsistencyResult && (
+                      <div className="text-center py-8 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          Skapa en brand seed först för att kontrollera stilkonsistens
+                        </p>
+                      </div>
                     )}
                   </TabsContent>
 

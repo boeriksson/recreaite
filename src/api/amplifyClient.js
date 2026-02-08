@@ -239,7 +239,11 @@ const createEntityAPI = (modelName) => {
       // Sanitize input - remove undefined values
       // Also stringify JSON fields that might have complex objects
       const sanitizedInput = {};
-      const jsonFields = ['ai_analysis', 'metadata', 'configuration'];
+      const jsonFields = [
+        'ai_analysis', 'metadata', 'configuration',
+        // Garment JSON fields
+        'colors', 'materials', 'style_details', 'complementary_items'
+      ];
 
       for (const [key, value] of Object.entries(input)) {
         if (value === undefined || value === null) {
@@ -264,7 +268,11 @@ const createEntityAPI = (modelName) => {
 
       // Sanitize input - remove undefined values
       const sanitizedInput = { id };
-      const jsonFields = ['ai_analysis', 'metadata', 'configuration'];
+      const jsonFields = [
+        'ai_analysis', 'metadata', 'configuration',
+        // Garment JSON fields
+        'colors', 'materials', 'style_details', 'complementary_items'
+      ];
 
       for (const [key, value] of Object.entries(input)) {
         if (value === undefined || value === null) {

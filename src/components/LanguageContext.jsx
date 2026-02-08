@@ -81,11 +81,9 @@ export const translations = {
     saveAsTemplate: 'Save as template',
 
     // Gallery
-    gallery: 'Gallery',
     noImagesYet: 'No images generated yet',
     uploadGarmentAndGenerate: 'Upload a garment and generate your first image',
     selectMultiple: 'Select multiple',
-    cancel: 'Cancel',
     selectAll: 'Select all',
     deselectAll: 'Deselect all',
     downloadSelected: 'Download',
@@ -112,10 +110,10 @@ export const translations = {
     openOriginalImage: 'Open original image in new window →',
     garmentsInOutfit: 'Garments in outfit',
     styleDescription: 'Style description',
-    aiAnalyzingStyle: 'AI analyzing style...',
+    aiAnalyzingStyleGallery: 'AI analyzing style...',
     aiAnalysisProductDescription: 'AI analysis (Product description)',
     copyProductText: 'Copy product text',
-    style: 'Style',
+    styleLabel: 'Style',
 
     // Dashboard
     onePhotoIn: 'One photo in. Every asset out.',
@@ -143,7 +141,6 @@ export const translations = {
     garmentsTotal: 'garments total',
     deleteGarment: 'Delete garment',
     deleteGarmentConfirm: 'Are you sure you want to delete this garment? This action cannot be undone.',
-    generate: 'Generate',
     information: 'Information',
     garmentInformationTitle: 'Garment information',
     aiDescription: 'AI Description',
@@ -176,7 +173,6 @@ export const translations = {
     // AI Styling
     aiStyling: 'AI Styling',
     selectGarmentsManually: 'Select garments manually',
-    aiAnalyzingStyle: 'AI analyzing your garments...',
     selectOutfit: 'Select outfit',
     letAiSuggestCombinations: 'Let AI suggest garment combinations that go well together',
     analyzing: 'Analyzing...',
@@ -185,7 +181,6 @@ export const translations = {
     analyzingYourGarments: 'Analyzing your garments...',
     aiCreatingCombinations: 'AI creating perfect outfit combinations',
     suggestionsFromAi: 'Suggestions from AI:',
-    garments: 'Garments',
     addForCompleteOutfit: 'Add for complete outfit:',
     outfitSelected: 'Outfit selected:',
     garmentsSelectedGenerateDirectly: 'garments selected. Generate directly or continue to model selection.',
@@ -453,11 +448,9 @@ export const translations = {
     saveAsTemplate: 'Spara som mall',
 
     // Gallery
-    gallery: 'Galleri',
     noImagesYet: 'Inga bilder genererade ännu',
     uploadGarmentAndGenerate: 'Ladda upp ett plagg och generera din första bild',
     selectMultiple: 'Välj flera',
-    cancel: 'Avbryt',
     selectAll: 'Markera alla',
     deselectAll: 'Avmarkera alla',
     downloadSelected: 'Ladda ner',
@@ -484,10 +477,10 @@ export const translations = {
     openOriginalImage: 'Öppna originalbild i nytt fönster →',
     garmentsInOutfit: 'Plagg i outfiten',
     styleDescription: 'Stilbeskrivning',
-    aiAnalyzingStyle: 'AI analyserar stilen...',
+    aiAnalyzingStyleGallery: 'AI analyserar stilen...',
     aiAnalysisProductDescription: 'AI-analys (Produktbeskrivning)',
     copyProductText: 'Kopiera produkttext',
-    style: 'Stil',
+    styleLabel: 'Stil',
 
     // Dashboard
     onePhotoIn: 'One photo in. Every asset out.',
@@ -515,7 +508,6 @@ export const translations = {
     garmentsTotal: 'plagg totalt',
     deleteGarment: 'Ta bort plagg',
     deleteGarmentConfirm: 'Är du säker på att du vill ta bort detta plagg? Denna åtgärd kan inte ångras.',
-    generate: 'Generera',
     information: 'Information',
     garmentInformationTitle: 'Plagginformation',
     aiDescription: 'AI-beskrivning',
@@ -548,7 +540,6 @@ export const translations = {
     // AI Styling
     aiStyling: 'AI Styling',
     selectGarmentsManually: 'Välj plagg att kombinera manuellt',
-    aiAnalyzingStyle: 'AI analyserar dina plagg...',
     selectOutfit: 'Välj outfit',
     letAiSuggestCombinations: 'Låt AI föreslå plagg-kombinationer som passar ihop',
     analyzing: 'Analyserar...',
@@ -557,7 +548,6 @@ export const translations = {
     analyzingYourGarments: 'Analyserar dina plagg...',
     aiCreatingCombinations: 'AI skapar perfekta outfit-kombinationer',
     suggestionsFromAi: 'Förslag från AI:',
-    garments: 'plagg',
     addForCompleteOutfit: 'Lägg till för komplett outfit:',
     outfitSelected: 'Outfit vald:',
     garmentsSelectedGenerateDirectly: 'plagg valda. Generera direkt eller fortsätt till modellval.',

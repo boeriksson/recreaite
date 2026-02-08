@@ -15,6 +15,17 @@ export const Garment = a.model({
   // AI analysis fields
   ai_description: a.string(),
   original_image_url: a.string(),
+  // Enhanced AI analysis fields
+  color: a.string(),
+  material: a.string(),
+  style: a.string(),
+  colors: a.json(),           // Array of colors
+  materials: a.json(),        // Array of materials
+  style_details: a.json(),    // Style details object
+  subcategory: a.string(),    // Specific garment type (e.g., hoodie, blazer)
+  suggested_gender: a.string(), // Suggested model gender
+  fit: a.string(),            // Fit description
+  complementary_items: a.json(), // Array of complementary items
 }).authorization((allow) => [
   allow.owner(),
   allow.authenticated(),

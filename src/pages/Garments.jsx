@@ -78,7 +78,7 @@ export default function Garments() {
 
   const { data: garments = [], isLoading } = useQuery({
     queryKey: ['garments'],
-    queryFn: () => base44.entities.Garment.list('-created_date')
+    queryFn: () => base44.entities.Garment.list('-createdAt')
   });
 
   const deleteMutation = useMutation({
@@ -320,9 +320,9 @@ export default function Garments() {
         <DialogContent className="bg-[#1A1A1A] border-white/10 text-white max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-white">{t.garmentInformationTitle}</DialogTitle>
-            {!isEditing && (
+            {!isEditing && infoGarment?.createdAt && (
               <DialogDescription className="text-white/60">
-                {t.created}: {infoGarment && format(new Date(infoGarment.created_date), 'PPP', { locale: language === 'sv' ? sv : enUS })}
+                {t.created}: {format(new Date(infoGarment.createdAt), 'PPP', { locale: language === 'sv' ? sv : enUS })}
               </DialogDescription>
             )}
           </DialogHeader>

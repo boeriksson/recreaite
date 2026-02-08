@@ -58,6 +58,7 @@ import GenerationProgress from '../components/generation/GenerationProgress';
 import ImageRefinementPanel from '../components/generation/ImageRefinementPanel';
 import AIStylist from '../components/styling/AIStylist';
 import BatchJobCreator from '../components/batch/BatchJobCreator';
+import BatchJobsList from '../components/batch/BatchJobsList';
 import { useLanguage } from '../components/LanguageContext';
 
 const STUDIO_PROMPT = 'Professional studio photography with consistent soft diffused lighting from key light at 45 degrees, fill light opposite side, and subtle rim light. CRITICAL: Clean seamless light grey studio backdrop (RGB 211, 211, 211) with NO windows, NO walls, NO architectural elements, NO environmental details - just plain seamless backdrop. Color temperature 5500K, high-key lighting setup maintaining exact same brightness and shadow falloff across all images. Model positioned center frame with even illumination. NEGATIVE PROMPT: No windows, no wall details, no interior elements, no background variations.';
@@ -113,7 +114,10 @@ export default function Upload() {
     }
   }, [isAuthenticated, isLoadingAuth, navigateToLogin, navigate]);
 
+  const { t, language } = useLanguage();
+
   const [mode, setMode] = useState('enkel'); // 'enkel', 'batch', 'style' or 'expert'
+  const [descriptionLanguage, setDescriptionLanguage] = useState('en');
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -151,6 +155,8 @@ export default function Upload() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [savedAnalysis, setSavedAnalysis] = useState(null);
+  const [showBatchJobCreator, setShowBatchJobCreator] = useState(false);
+  const [aiStylistSelected, setAiStylistSelected] = useState(false);
 
   // Load garment or template from URL parameter
   React.useEffect(() => {
@@ -325,18 +331,75 @@ export default function Upload() {
         processedUrl = file_url;
       }
       
+      const promptText = descriptionLanguage === 'sv'
+        ? 'Analysera detta plagg noggrant och ge detaljerad information. Identifiera exakt plaggtyp (t.ex. hoodie, kavaj, chinos, sneakers), material, färg, mönster, passform, och stil. Ge även förslag på kompletterande plagg eller accessoarer som skulle passa bra tillsammans med detta. Svara på SVENSKA.'
+        : 'Analyze this garment carefully and provide detailed information. Identify the exact garment type (e.g. hoodie, blazer, chinos, sneakers), material, color, pattern, fit, and style. Also suggest complementary garments or accessories that would pair well with this. Respond in ENGLISH.';
+
       const analysis = await base44.integrations.Core.InvokeLLM({
-        prompt: 'Analysera detta plagg och ge detaljerad information. Beskriv vad det är för typ av plagg, föreslå en passande kategori, och ge en kort produktbeskrivning (max 2 meningar).',
+        prompt: promptText,
         file_urls: [processedUrl],
         response_json_schema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Kort produktnamn, t.ex. "Svart Blazer" eller "Blå Jeans"' },
-            category: { type: 'string', enum: ['tops', 'bottoms', 'dresses', 'outerwear', 'accessories'] },
-            description: { type: 'string', description: 'Kort beskrivning av plagget (max 2 meningar)' },
-            style: { type: 'string', description: 'Stil på plagget, t.ex. casual, formal, sporty' }
+            name: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Specifikt produktnamn inkl. färg och typ, t.ex. "Svart Oversize Hoodie" eller "Blå Slim-fit Jeans"' : 'Specific product name including color and type, e.g. "Black Oversized Hoodie" or "Blue Slim-fit Jeans"'
+            },
+            category: {
+              type: 'string',
+              enum: ['tops', 'bottoms', 'dresses', 'outerwear', 'accessories']
+            },
+            subcategory: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Specifik plaggtyp: t.ex. hoodie, t-shirt, blazer, kavaj, cardigan, jeans, chinos, shorts, kjol, klänning, jacka, kappa, sneakers, boots, väska, hatt, halsduk, etc.' : 'Specific garment type: e.g. hoodie, t-shirt, blazer, jacket, cardigan, jeans, chinos, shorts, skirt, dress, coat, sneakers, boots, bag, hat, scarf, etc.'
+            },
+            suggested_gender: {
+              type: 'string',
+              enum: ['female', 'male', 'neutral', 'child'],
+              description: descriptionLanguage === 'sv' ? 'Föreslaget kön för modellen baserat på plagget. Välj "child" för barnkläder, "female" för klänningar eller kvinnliga plagg, "male" för manliga plagg, "neutral" för könsneutrala plagg' : 'Suggested gender for model based on garment. Choose "child" for children\'s clothes, "female" for dresses or feminine garments, "male" for masculine garments, "neutral" for gender-neutral items'
+            },
+            description: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Detaljerad beskrivning: material, passform, detaljer (max 3 meningar)' : 'Detailed description: material, fit, details (max 3 sentences)'
+            },
+            style: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Stilkategori: streetwear, vintage, minimalistisk, klassisk, sporty, casual, formell, bohemisk, prep, workwear, etc.' : 'Style category: streetwear, vintage, minimalist, classic, sporty, casual, formal, bohemian, preppy, workwear, etc.'
+            },
+            style_details: {
+              type: 'array',
+              items: { type: 'string' },
+              description: descriptionLanguage === 'sv' ? 'Lista med 2-4 detaljerade stilförslag' : 'List of 2-4 detailed style suggestions'
+            },
+            colors: {
+              type: 'array',
+              items: { type: 'string' },
+              description: descriptionLanguage === 'sv' ? 'Lista med alla färger på plagget (primär först)' : 'List of all colors in the garment (primary first)'
+            },
+            color: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Primär färg på plagget' : 'Primary color of the garment'
+            },
+            materials: {
+              type: 'array',
+              items: { type: 'string' },
+              description: descriptionLanguage === 'sv' ? 'Lista med alla synliga material' : 'List of all visible materials'
+            },
+            material: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Primärt material' : 'Primary material'
+            },
+            fit: {
+              type: 'string',
+              description: descriptionLanguage === 'sv' ? 'Passform: slim, regular, relaxed, oversized, tight, loose, etc.' : 'Fit: slim, regular, relaxed, oversized, tight, loose, etc.'
+            },
+            complementary_items: {
+              type: 'array',
+              items: { type: 'string' },
+              description: descriptionLanguage === 'sv' ? 'Lista med 3-5 kompletterande plagg' : 'List of 3-5 complementary garments'
+            }
           },
-          required: ['name', 'category']
+          required: ['name', 'category', 'subcategory', 'style', 'colors', 'materials', 'style_details', 'suggested_gender']
         }
       });
       
@@ -345,8 +408,24 @@ export default function Upload() {
         setGarmentData(prev => ({
           ...prev,
           name: analysis.name || prev.name,
-          category: analysis.category || prev.category
+          category: analysis.category || prev.category,
+          color: analysis.color || prev.color,
+          material: analysis.material || prev.material,
+          style: analysis.style || prev.style,
+          colors: analysis.colors || prev.colors,
+          materials: analysis.materials || prev.materials,
+          style_details: analysis.style_details || prev.style_details,
+          subcategory: analysis.subcategory || prev.subcategory,
+          suggested_gender: analysis.suggested_gender || prev.suggested_gender,
+          fit: analysis.fit || prev.fit,
+          complementary_items: analysis.complementary_items || prev.complementary_items,
+          ai_description: analysis.description || prev.ai_description
         }));
+
+        // Auto-select gender based on AI suggestion
+        if (analysis.suggested_gender && !selectedModel) {
+          setSelectedGender(analysis.suggested_gender);
+        }
       } else {
         console.error('Ogiltig analys:', analysis);
         setAiSuggestions({ error: 'AI kunde inte identifiera plagget. Fyll i manuellt.' });
@@ -865,6 +944,7 @@ export default function Upload() {
         <div className="space-y-4">
           {/* Batch Mode: Select Multiple Garments */}
           {mode === 'batch' && (
+            <>
             <AccordionSection id="batch-garments" title="1. Välj plagg för batch-generering" isComplete={batchGarments.length > 0} openSection={openSection} setOpenSection={setOpenSection}>
                 <div className="space-y-4">
                   <p className="text-sm text-black/60 dark:text-white/60">Välj flera plagg att generera bilder för samtidigt</p>
@@ -922,6 +1002,12 @@ export default function Upload() {
                   </Button>
                 </div>
             </AccordionSection>
+
+            {/* Existing Batch Jobs List */}
+            <div className="mt-8 pt-8 border-t border-dashed border-black/10 dark:border-white/10">
+              <BatchJobsList />
+            </div>
+            </>
           )}
 
           {/* Style Mode: Select Multiple Garments */}
@@ -1047,6 +1133,35 @@ export default function Upload() {
           {mode !== 'style' && uploadedUrl && (
             <AccordionSection id="details" title="2. Plagginformation" isComplete={!!garmentData.name} openSection={openSection} setOpenSection={setOpenSection}>
               <div className="space-y-4">
+                {/* Language Selector for AI Description */}
+                <div className="p-3 bg-black/5 dark:bg-white/5 rounded-lg">
+                  <Label className="text-black/80 dark:text-white/80 mb-2 block">Språk för AI-beskrivning</Label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setDescriptionLanguage('en')}
+                      className={cn(
+                        "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                        descriptionLanguage === 'en'
+                          ? "bg-[#392599] text-white"
+                          : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60"
+                      )}
+                    >
+                      Generera på engelska
+                    </button>
+                    <button
+                      onClick={() => setDescriptionLanguage('sv')}
+                      className={cn(
+                        "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                        descriptionLanguage === 'sv'
+                          ? "bg-[#392599] text-white"
+                          : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60"
+                      )}
+                    >
+                      Generera på svenska
+                    </button>
+                  </div>
+                </div>
+
                 {/* AI Analysis Status */}
                 {analyzing && (
                   <div className="p-4 bg-[#392599]/10 border border-[#392599]/30 rounded-xl flex items-center gap-3">
@@ -1106,20 +1221,86 @@ export default function Upload() {
                             "{aiSuggestions.description}"
                           </p>
                         )}
-                        <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                          {aiSuggestions.subcategory && (
+                            <div className="p-2 bg-white/60 dark:bg-black/20 rounded">
+                              <p className="text-green-600 dark:text-green-400">Typ</p>
+                              <p className="text-black dark:text-white capitalize">{aiSuggestions.subcategory}</p>
+                            </div>
+                          )}
                           {aiSuggestions.style && (
                             <div className="p-2 bg-white/60 dark:bg-black/20 rounded">
                               <p className="text-green-600 dark:text-green-400">Stil</p>
                               <p className="text-black dark:text-white capitalize">{aiSuggestions.style}</p>
                             </div>
                           )}
-                          {aiSuggestions.category && (
+                          {aiSuggestions.color && (
                             <div className="p-2 bg-white/60 dark:bg-black/20 rounded">
-                              <p className="text-green-600 dark:text-green-400">Kategori</p>
-                              <p className="text-black dark:text-white capitalize">{aiSuggestions.category}</p>
+                              <p className="text-green-600 dark:text-green-400">Färg</p>
+                              <p className="text-black dark:text-white capitalize">{aiSuggestions.color}</p>
+                            </div>
+                          )}
+                          {aiSuggestions.material && (
+                            <div className="p-2 bg-white/60 dark:bg-black/20 rounded">
+                              <p className="text-green-600 dark:text-green-400">Material</p>
+                              <p className="text-black dark:text-white capitalize">{aiSuggestions.material}</p>
+                            </div>
+                          )}
+                          {aiSuggestions.fit && (
+                            <div className="p-2 bg-white/60 dark:bg-black/20 rounded">
+                              <p className="text-green-600 dark:text-green-400">Passform</p>
+                              <p className="text-black dark:text-white capitalize">{aiSuggestions.fit}</p>
                             </div>
                           )}
                         </div>
+                        {aiSuggestions.colors && aiSuggestions.colors.length > 0 && (
+                          <div className="pt-3 border-t border-green-200 dark:border-green-700/30">
+                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-2">Färger:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {aiSuggestions.colors.map((color, idx) => (
+                                <span key={idx} className="px-2 py-1 bg-white/60 dark:bg-black/20 rounded text-xs text-black dark:text-white">
+                                  {color}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {aiSuggestions.materials && aiSuggestions.materials.length > 0 && (
+                          <div className="pt-3 border-t border-green-200 dark:border-green-700/30">
+                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-2">Material:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {aiSuggestions.materials.map((mat, idx) => (
+                                <span key={idx} className="px-2 py-1 bg-white/60 dark:bg-black/20 rounded text-xs text-black dark:text-white">
+                                  {mat}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {aiSuggestions.style_details && aiSuggestions.style_details.length > 0 && (
+                          <div className="pt-3 border-t border-green-200 dark:border-green-700/30">
+                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-2">Stilförslag:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {aiSuggestions.style_details.map((detail, idx) => (
+                                <span key={idx} className="px-2 py-1 bg-white/60 dark:bg-black/20 rounded text-xs text-black dark:text-white capitalize">
+                                  {detail}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {aiSuggestions.complementary_items && aiSuggestions.complementary_items.length > 0 && (
+                          <div className="pt-3 border-t border-green-200 dark:border-green-700/30">
+                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-2">Passar bra med:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {aiSuggestions.complementary_items.map((item, idx) => (
+                                <span key={idx} className="px-2 py-1 bg-white/60 dark:bg-black/20 rounded text-xs text-black dark:text-white">
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1290,7 +1471,7 @@ export default function Upload() {
                 {/* Gender Selection */}
                 <div>
                   <Label className="text-black/80 dark:text-white/80 mb-2">Kön</Label>
-                  <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="grid grid-cols-3 gap-3 mt-2">
                     <button
                       onClick={() => {
                         setSelectedGender('female');
@@ -1299,7 +1480,7 @@ export default function Upload() {
                       className={cn(
                         "p-4 rounded-xl border-2 text-left transition-all",
                         selectedGender === 'female' && !selectedModel
-                          ? "border-[#0071e3] bg-[#0071e3]/5" 
+                          ? "border-[#0071e3] bg-[#0071e3]/5"
                           : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
                       )}
                     >
@@ -1314,12 +1495,27 @@ export default function Upload() {
                       className={cn(
                         "p-4 rounded-xl border-2 text-left transition-all",
                         selectedGender === 'male' && !selectedModel
-                          ? "border-[#0071e3] bg-[#0071e3]/5" 
+                          ? "border-[#0071e3] bg-[#0071e3]/5"
                           : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
                       )}
                     >
                       <p className="font-medium text-black dark:text-white">Man</p>
                       <p className="text-sm text-black/50 dark:text-white/50 mt-1">Manlig modell</p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedGender('child');
+                        setSelectedModel(null);
+                      }}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-left transition-all",
+                        selectedGender === 'child' && !selectedModel
+                          ? "border-[#0071e3] bg-[#0071e3]/5"
+                          : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                      )}
+                    >
+                      <p className="font-medium text-black dark:text-white">Barn</p>
+                      <p className="text-sm text-black/50 dark:text-white/50 mt-1">Barnmodell</p>
                     </button>
                   </div>
                 </div>
