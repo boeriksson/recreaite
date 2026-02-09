@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useLanguage } from '../LanguageContext';
+import { SignedImage } from '@/components/ui/SignedImage';
 
 export default function AIStylist({
   allGarments,
@@ -198,7 +199,7 @@ För varje outfit, förklara kort varför plaggen passar ihop.`;
                     {outfit.garments.slice(0, 4).map((garment) => (
                       <div key={garment.id} className="aspect-[3/4] rounded-lg overflow-hidden bg-[#f5f5f7] dark:bg-white/5">
                         {garment.image_url ? (
-                          <img src={garment.image_url} alt={garment.name} className="w-full h-full object-cover" />
+                          <SignedImage src={garment.image_url} alt={garment.name} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Shirt className="h-6 w-6 text-black/20 dark:text-white/20" />

@@ -54,6 +54,7 @@ import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 
 import FileDropzone from '../components/upload/FileDropzone';
+import GarmentSelector from '../components/upload/GarmentSelector';
 import GenerationProgress from '../components/generation/GenerationProgress';
 import ImageRefinementPanel from '../components/generation/ImageRefinementPanel';
 import AIStylist from '../components/styling/AIStylist';
@@ -63,43 +64,48 @@ import { useLanguage } from '../components/LanguageContext';
 
 const STUDIO_PROMPT = 'Professional studio photography with consistent soft diffused lighting from key light at 45 degrees, fill light opposite side, and subtle rim light. CRITICAL: Clean seamless light grey studio backdrop (RGB 211, 211, 211) with NO windows, NO walls, NO architectural elements, NO environmental details - just plain seamless backdrop. Color temperature 5500K, high-key lighting setup maintaining exact same brightness and shadow falloff across all images. Model positioned center frame with even illumination. NEGATIVE PROMPT: No windows, no wall details, no interior elements, no background variations.';
 
-const AccordionSection = ({ id, title, isComplete, children, openSection, setOpenSection, thumbnail }) => (
-  <div className={cn(
-    "border rounded-2xl overflow-hidden transition-all",
-    openSection === id ? "border-black/20 bg-white dark:border-white/20 dark:bg-white/5" : "border-black/10 bg-[#f5f5f7] dark:border-white/10 dark:bg-white/5"
-  )}>
-    <button
-      onClick={() => setOpenSection(openSection === id ? null : id)}
-      className="w-full p-6 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-    >
-      <div className="flex items-center gap-3">
-        {isComplete && <Check className="h-5 w-5 text-green-600" />}
-        <h3 className="text-lg font-semibold text-black dark:text-white">{title}</h3>
-        {thumbnail && (
-          <div className="h-10 w-10 rounded-lg overflow-hidden bg-white dark:bg-white/5 flex-shrink-0 border border-black/10 dark:border-white/10">
-            {thumbnail}
-          </div>
-        )}
-      </div>
-      {openSection === id ? <ChevronUp className="h-5 w-5 text-black dark:text-white" /> : <ChevronDown className="h-5 w-5 text-black dark:text-white" />}
-    </button>
-    
-    <AnimatePresence>
-      {openSection === id && (
-        <motion.div
-          initial={{ height: 0 }}
-          animate={{ height: 'auto' }}
-          exit={{ height: 0 }}
-          className="overflow-hidden"
-        >
-          <div className="p-6 pt-0 border-t border-black/5 dark:border-white/10">
-            {children}
-          </div>
-        </motion.div>
+const AccordionSection = ({ id, title, isComplete, children, openSection, setOpenSection, thumbnail }) => {
+  return (
+    <div 
+      data-section-id={id}
+      className={cn(
+        "border rounded-2xl overflow-hidden transition-all",
+        openSection === id ? "border-black/20 bg-white dark:border-white/20 dark:bg-white/5" : "border-black/10 bg-[#f5f5f7] dark:border-white/10 dark:bg-white/5"
       )}
-    </AnimatePresence>
-  </div>
-);
+    >
+      <button
+        onClick={() => setOpenSection(openSection === id ? null : id)}
+        className="w-full p-6 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          {isComplete && <Check className="h-5 w-5 text-green-600" />}
+          <h3 className="text-lg font-semibold text-black dark:text-white">{title}</h3>
+          {thumbnail && (
+            <div className="h-10 w-10 rounded-lg overflow-hidden bg-white dark:bg-white/5 flex-shrink-0 border border-black/10 dark:border-white/10">
+              {thumbnail}
+            </div>
+          )}
+        </div>
+        {openSection === id ? <ChevronUp className="h-5 w-5 text-black dark:text-white" /> : <ChevronDown className="h-5 w-5 text-black dark:text-white" />}
+      </button>
+      
+      <AnimatePresence>
+        {openSection === id && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-6 pt-6 border-t border-black/5 dark:border-white/10">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default function Upload() {
   const navigate = useNavigate();
@@ -142,6 +148,38 @@ export default function Upload() {
   const [customPrompt, setCustomPrompt] = useState('');
   
   const [openSection, setOpenSection] = useState('upload');
+  
+  // Helper function to scroll to a section
+  const scrollToSection = React.useCallback((sectionId) => {
+    setTimeout(() => {
+      const element = document.querySelector(`[data-section-id="${sectionId}"]`);
+      if (element) {
+        // Get the position relative to the document
+        const rect = element.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const elementTop = rect.top + scrollTop;
+        
+        // Account for the fixed header (h-11 = 44px in Tailwind) plus 5px margin
+        const headerHeight = 44;
+        const margin = 5;
+        
+        // Scroll so the top of the element is just below the header with a small margin
+        window.scrollTo({
+          top: elementTop - headerHeight - margin,
+          behavior: 'smooth'
+        });
+      }
+    }, 300); // Delay to allow animation to start
+  }, []);
+  
+  // Enhanced setOpenSection that also scrolls (used for explicit user actions like "Fortsätt")
+  const setOpenSectionWithScroll = React.useCallback((sectionId) => {
+    setOpenSection(sectionId);
+    if (sectionId) {
+      scrollToSection(sectionId);
+    }
+  }, [scrollToSection]);
+  
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [generatedImage, setGeneratedImage] = useState(null);
@@ -158,7 +196,7 @@ export default function Upload() {
   const [savedAnalysis, setSavedAnalysis] = useState(null);
   const [showBatchJobCreator, setShowBatchJobCreator] = useState(false);
 
-  // Set default open section based on mode
+  // Set default open section based on mode (without scrolling on initial tab selection)
   React.useEffect(() => {
     if (mode === 'style') {
       setOpenSection('ai-styling');
@@ -210,7 +248,7 @@ export default function Upload() {
               last_used: new Date().toISOString()
             });
             
-            setOpenSection('upload');
+            setOpenSectionWithScroll('upload');
           }
         } catch (error) {
           console.error('Failed to load template:', error);
@@ -294,7 +332,10 @@ export default function Upload() {
 
   const createGarmentMutation = useMutation({
     mutationFn: (data) => base44.entities.Garment.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['garments'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['garments'] });
+      queryClient.invalidateQueries({ queryKey: ['all-garments'] });
+    }
   });
 
   const createGeneratedImageMutation = useMutation({
@@ -450,6 +491,60 @@ export default function Upload() {
   };
 
   const handleFileSelect = async (selectedFile) => {
+    // Batch mode: upload and add to batchGarments
+    if (mode === 'batch') {
+      setUploading(true);
+      try {
+        // Handle both single file and multiple files
+        const files = Array.isArray(selectedFile) ? selectedFile : [selectedFile];
+        const newGarments = [];
+
+        // Upload and process each file
+        for (const file of files) {
+          try {
+            const { file_url } = await base44.integrations.Core.UploadFile({ file });
+            
+            // Analyze garment to get basic info
+            const analysis = await base44.integrations.Core.InvokeLLM({
+              prompt: 'Analysera detta plagg och ge kort information. Ge kategori och namn.',
+              file_urls: [file_url],
+              response_json_schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Kort produktnamn' },
+                  category: { type: 'string', enum: ['tops', 'bottoms', 'dresses', 'outerwear', 'accessories'] },
+                },
+                required: ['name', 'category']
+              }
+            }).catch(() => null); // Continue even if analysis fails
+
+            // Create garment entity
+            const newGarment = await createGarmentMutation.mutateAsync({
+              name: analysis?.name || file.name || 'Nytt plagg',
+              image_url: file_url,
+              category: analysis?.category || 'tops',
+            });
+
+            newGarments.push(newGarment);
+          } catch (error) {
+            console.error('Failed to upload file:', file.name, error);
+            // Continue with next file even if one fails
+          }
+        }
+
+        // Add all new garments to batch garments
+        if (newGarments.length > 0) {
+          setBatchGarments([...batchGarments, ...newGarments]);
+        }
+      } catch (error) {
+        console.error('Batch upload failed:', error);
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
+    // Enkel/Expert mode: standard upload flow
     setFile(selectedFile);
     const reader = new FileReader();
     reader.onload = (e) => setPreview(e.target.result);
@@ -463,7 +558,7 @@ export default function Upload() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file: selectedFile });
       setUploadedUrl(file_url);
-      setOpenSection('details');
+      setOpenSectionWithScroll('details');
       
       // Analyze garment automatically
       await analyzeGarment(file_url);
@@ -485,7 +580,10 @@ export default function Upload() {
 
     setBatchGenerating(true);
     setBatchProgress({ current: 0, total: batchGarments.length });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll to top to show the generation widget
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
 
     for (let i = 0; i < batchGarments.length; i++) {
       const garment = batchGarments[i];
@@ -493,8 +591,19 @@ export default function Upload() {
 
       try {
         let modelPrompt = 'professional fashion model';
+        let modelInstruction = '';
+        const imageUrls = [];
+
         if (selectedModel) {
-          modelPrompt = selectedModel.prompt;
+          // Add model image FIRST for highest priority reference
+          if (selectedModel.portrait_url || selectedModel.image_url) {
+            const modelImageUrl = selectedModel.portrait_url || selectedModel.image_url;
+            imageUrls.push(modelImageUrl);
+          }
+          // Be explicit about gender in the prompt
+          const genderText = selectedModel.gender === 'female' ? 'female' : selectedModel.gender === 'male' ? 'male' : 'androgynous';
+          modelPrompt = `${genderText} ${selectedModel.prompt}`;
+          modelInstruction = ` ABSOLUTE CRITICAL REQUIREMENT: The model MUST be ${genderText.toUpperCase()} and look EXACTLY like the first reference image. EXACT SAME GENDER: ${genderText.toUpperCase()}. EXACT SAME FACE - identical facial features, same eye shape and color, same nose, same mouth, same jawline, same skin tone, same facial structure, same hair color, same hair style. The model in the generated image must be PERFECTLY IDENTICAL to the model in the first reference photo in EVERY way - gender, face, hair, features. DO NOT change gender, do NOT change hair color, do NOT change facial features, do NOT create a different person. CRITICAL: DO NOT copy, use, or reference ANY clothing, garments, or accessories from the model reference image. IGNORE all garments in the model reference image completely. Use ONLY the face, hair, and body of the model. The garments must come exclusively from the separate garment reference images provided.`;
         } else if (selectedGender) {
           modelPrompt = `professional ${selectedGender} fashion model`;
         }
@@ -511,14 +620,15 @@ export default function Upload() {
           envPrompt = getEnvironmentPrompt(selectedEnvironment);
         }
 
-        const prompt = `${modelPrompt} wearing the garment in the reference image. High-quality product photography, professional lighting. ${seedPrompt}${envPrompt}`;
+        const prompt = `${modelPrompt} wearing the garment in the reference image. High-quality product photography, professional lighting. ${seedPrompt}${envPrompt}${modelInstruction}`;
 
         // Sign the garment URL for the Lambda to fetch
         const signedGarmentUrl = await getSignedUrl(garment.image_url);
+        imageUrls.push(signedGarmentUrl);
 
         const result = await base44.integrations.Core.GenerateImage({
           prompt: `${prompt} 4:5 aspect ratio, portrait orientation.`,
-          existing_image_urls: [signedGarmentUrl]
+          existing_image_urls: imageUrls
         });
 
         await createGeneratedImageMutation.mutateAsync({
@@ -555,7 +665,18 @@ export default function Upload() {
         if (selectedGarments.length < 2) {
           throw new Error('Välj minst 2 plagg för Style-läge');
         }
-        imageUrls = selectedGarments.map(g => g.image_url);
+        // Initialize imageUrls with model image first (if selected), then garments
+        imageUrls = [];
+        if (selectedModel && (selectedModel.portrait_url || selectedModel.image_url)) {
+          const modelImageUrl = selectedModel.portrait_url || selectedModel.image_url;
+          imageUrls.push(modelImageUrl);
+          console.log('Style mode: Added model image to imageUrls:', modelImageUrl?.substring(0, 100));
+        } else {
+          console.warn('Style mode: No model selected or model has no image URL');
+        }
+        // Add garment images after the model image
+        imageUrls.push(...selectedGarments.map(g => g.image_url));
+        console.log('Style mode: Total imageUrls:', imageUrls.length, 'Garments:', selectedGarments.length);
         // Use first garment for the database record
         garmentId = selectedGarments[0].id;
       } else {
@@ -635,10 +756,7 @@ export default function Upload() {
         let modelInstruction = '';
 
         if (selectedModel) {
-          // Add model image FIRST for highest priority reference
-          if (selectedModel.portrait_url || selectedModel.image_url) {
-            imageUrls.unshift(selectedModel.portrait_url || selectedModel.image_url);
-          }
+          // Model image should already be first in imageUrls from above
           // Be explicit about gender in the prompt
           const genderText = selectedModel.gender === 'female' ? 'female' : selectedModel.gender === 'male' ? 'male' : 'androgynous';
           modelPrompt = `${genderText} ${selectedModel.prompt}`;
@@ -660,7 +778,7 @@ export default function Upload() {
         }
         
         const garmentDescriptions = selectedGarments.map(g => g.name).join(', ');
-        prompt = `${modelPrompt} wearing these garments: ${garmentDescriptions}. ${seedPrompt}${envPrompt}High-quality fashion photography, professional lighting. ABSOLUTE CRITICAL GARMENT RULE: Each garment from the reference images must be reproduced with PERFECT ACCURACY - exact same colors, exact same textures, exact same patterns, exact same details, exact same everything. DO NOT add, modify, embellish, hallucinate, or invent ANY features, decorations, patterns, stitching, logos, buttons, zippers, pockets, or ANY other details that are not clearly visible in the garment reference images. All garments must be IDENTICAL to their references with ZERO modifications or additions.`;
+        prompt = `${modelPrompt} wearing these garments: ${garmentDescriptions}. ${seedPrompt}${envPrompt}${modelInstruction}High-quality fashion photography, professional lighting. ABSOLUTE CRITICAL GARMENT RULE: Each garment from the reference images must be reproduced with PERFECT ACCURACY - exact same colors, exact same textures, exact same patterns, exact same details, exact same everything. DO NOT add, modify, embellish, hallucinate, or invent ANY features, decorations, patterns, stitching, logos, buttons, zippers, pockets, or ANY other details that are not clearly visible in the garment reference images. All garments must be IDENTICAL to their references with ZERO modifications or additions.`;
       } else if (mode === 'enkel' || mode === 'batch') {
         let modelPrompt = 'professional fashion model';
         let modelInstruction = '';
@@ -770,10 +888,13 @@ export default function Upload() {
 
         try {
           // Sign all S3 URLs before sending to Lambda
+          console.log('Image URLs before signing:', imageUrls);
+          console.log('Selected model:', selectedModel ? { id: selectedModel.id, name: selectedModel.name, portrait_url: selectedModel.portrait_url, image_url: selectedModel.image_url } : 'none');
           const signedImageUrls = await Promise.all(
             imageUrls.map(url => getSignedUrl(url))
           );
           console.log('Signed image URLs for generation:', signedImageUrls.length);
+          console.log('First image URL (should be model):', signedImageUrls[0]?.substring(0, 100));
 
           const generateWithTimeout = async () => {
             const result = await base44.integrations.Core.GenerateImage({
@@ -974,73 +1095,239 @@ export default function Upload() {
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-[#C9A962]" />
           <p className="text-black/60 dark:text-white/60">Laddar plagg...</p>
         </div>
-      ) : !generating && !generatedImage ? (
+      ) : !generating && !generatedImage && !batchGenerating ? (
         <div className="space-y-4">
           {/* Batch Mode: Select Multiple Garments */}
           {mode === 'batch' && (
             <>
-            <AccordionSection id="batch-garments" title="1. Välj plagg för batch-generering" isComplete={batchGarments.length > 0} openSection={openSection} setOpenSection={setOpenSection}>
-                <div className="space-y-4">
-                  <p className="text-sm text-black/60 dark:text-white/60">Välj flera plagg att generera bilder för samtidigt</p>
-                  <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                    {allGarments.map((garment) => {
-                      const isSelected = batchGarments.some(g => g.id === garment.id);
-                      return (
-                        <button
-                          key={garment.id}
-                          onClick={() => {
-                            if (isSelected) {
-                              setBatchGarments(batchGarments.filter(g => g.id !== garment.id));
-                            } else {
-                              setBatchGarments([...batchGarments, garment]);
-                            }
-                          }}
-                          className={cn(
-                            "aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all relative",
-                            isSelected ? "border-[#0071e3] ring-2 ring-[#0071e3]/20" : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
-                          )}
-                        >
-                          {garment.image_url ? (
-                            <SignedImage src={garment.image_url} alt={garment.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-[#f5f5f7] dark:bg-white/5 flex items-center justify-center">
-                              <Shirt className="h-6 w-6 text-black/20 dark:text-white/20" />
-                            </div>
-                          )}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-[#392599] flex items-center justify-center">
-                              <Check className="h-4 w-4 text-white" />
-                            </div>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                            <p className="text-xs text-white truncate">{garment.name}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {batchGarments.length > 0 && (
-                    <div className="p-3 bg-[#392599]/10 rounded-lg">
-                      <p className="text-sm text-black dark:text-white">
-                        <span className="font-medium">{batchGarments.length} plagg valda</span>
-                      </p>
-                    </div>
-                  )}
+            <AccordionSection 
+              id="batch-garments" 
+              title="1. Välj plagg för batch-generering" 
+              isComplete={batchGarments.length > 0} 
+              openSection={openSection} 
+              setOpenSection={setOpenSection}
+            >
+              <GarmentSelector
+                onFileSelect={handleFileSelect}
+                onGarmentSelect={(garment) => {
+                  setBatchGarments([...batchGarments, garment]);
+                }}
+                onGarmentDeselect={(garmentId) => {
+                  setBatchGarments(batchGarments.filter(g => g.id !== garmentId));
+                }}
+                allGarments={allGarments}
+                selectedGarments={batchGarments}
+                allowMultiple={true}
+                uploading={uploading}
+                preview={null}
+                onClear={() => {}}
+              />
+              
+              {batchGarments.length > 0 && (
+                <div className="mt-6">
                   <Button
-                    onClick={() => setOpenSection('model')}
-                    disabled={batchGarments.length === 0}
+                    onClick={() => setOpenSectionWithScroll('model')}
                     variant="outline"
                     className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
                   >
                     Fortsätt
                   </Button>
                 </div>
+              )}
             </AccordionSection>
 
-            {/* Existing Batch Jobs List */}
-            <div className="mt-8 pt-8 border-t border-dashed border-black/10 dark:border-white/10">
-              <BatchJobsList />
-            </div>
+            {/* Model Selection for Batch Mode */}
+            {batchGarments.length > 0 && (
+              <AccordionSection 
+                id="model" 
+                title="2. Välj modell" 
+                isComplete={selectedModel !== null || selectedGender !== null} 
+                openSection={openSection} 
+                setOpenSection={setOpenSection}
+                thumbnail={selectedModel?.image_url ? (
+                  <SignedImage src={selectedModel.image_url} alt={selectedModel.name} className="w-full h-full object-cover" />
+                ) : null}
+              >
+                <div className="space-y-4">
+                  {selectedModel && (
+                    <div className="p-4 bg-[#392599]/10 border border-[#392599]/30 dark:bg-[#392599]/10 dark:border-[#392599]/30 rounded-xl flex items-center gap-3">
+                      <div className="h-16 w-16 rounded-lg overflow-hidden bg-white dark:bg-white/5 flex-shrink-0">
+                        {selectedModel.image_url ? (
+                          <SignedImage src={selectedModel.image_url} alt={selectedModel.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Sparkles className="h-6 w-6 text-[#392599]" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-black dark:text-white">{selectedModel.name}</p>
+                        <p className="text-sm text-black/60 dark:text-white/60 capitalize">{selectedModel.gender} • {selectedModel.ethnicity}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gender Selection */}
+                  <div>
+                    <Label className="text-black/80 dark:text-white/80 mb-2">Kön</Label>
+                    <div className="grid grid-cols-3 gap-3 mt-2">
+                      <button
+                        onClick={() => {
+                          setSelectedGender('female');
+                          setSelectedModel(null);
+                          setOpenSectionWithScroll('environment');
+                        }}
+                        className={cn(
+                          "p-4 rounded-xl border-2 text-left transition-all",
+                          selectedGender === 'female' && !selectedModel
+                            ? "border-[#0071e3] bg-[#0071e3]/5"
+                            : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                        )}
+                      >
+                        <p className="font-medium text-black dark:text-white">Kvinna</p>
+                        <p className="text-sm text-black/50 dark:text-white/50 mt-1">Kvinnlig modell</p>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedGender('male');
+                          setSelectedModel(null);
+                          setOpenSectionWithScroll('environment');
+                        }}
+                        className={cn(
+                          "p-4 rounded-xl border-2 text-left transition-all",
+                          selectedGender === 'male' && !selectedModel
+                            ? "border-[#0071e3] bg-[#0071e3]/5"
+                            : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                        )}
+                      >
+                        <p className="font-medium text-black dark:text-white">Man</p>
+                        <p className="text-sm text-black/50 dark:text-white/50 mt-1">Manlig modell</p>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedGender('child');
+                          setSelectedModel(null);
+                          setOpenSectionWithScroll('environment');
+                        }}
+                        className={cn(
+                          "p-4 rounded-xl border-2 text-left transition-all",
+                          selectedGender === 'child' && !selectedModel
+                            ? "border-[#0071e3] bg-[#0071e3]/5"
+                            : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                        )}
+                      >
+                        <p className="font-medium text-black dark:text-white">Barn</p>
+                        <p className="text-sm text-black/50 dark:text-white/50 mt-1">Barnmodell</p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Predefined Models */}
+                  {models.length > 0 && (
+                    <div>
+                      <Label className="text-black/80 dark:text-white/80 mb-2">Eller välj specifik modell</Label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                        {models
+                          .filter(model => !selectedGender || model.gender === selectedGender)
+                          .map((model) => (
+                            <button
+                              key={model.id}
+                              onClick={() => {
+                                setSelectedModel(model);
+                                setSelectedGender(null);
+                                setOpenSectionWithScroll('environment');
+                              }}
+                              className={cn(
+                                "aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all",
+                                selectedModel?.id === model.id ? "border-[#392599]" : "border-black/10 hover:border-black/20"
+                              )}
+                            >
+                              {model.image_url ? (
+                                <SignedImage src={model.image_url} alt={model.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-[#f5f5f7] flex items-center justify-center">
+                                  <span className="text-xs text-black/40">{model.name}</span>
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </AccordionSection>
+            )}
+
+            {/* Environment Selection for Batch Mode */}
+            {batchGarments.length > 0 && (selectedModel !== null || selectedGender !== null) && (
+              <AccordionSection id="environment" title="3. Välj miljö" isComplete={selectedEnvironment !== null} openSection={openSection} setOpenSection={setOpenSection}>
+                <div className="space-y-3">
+                  {selectedSeed && useSeedEnvironment && (
+                    <div className="mb-4 p-3 bg-[#C9A962]/10 border border-[#C9A962]/30 rounded-lg">
+                      <p className="text-sm text-black dark:text-white">
+                        Använder seedens miljö: <span className="font-medium capitalize">{selectedSeed.environment?.replace(/_/g, ' ')}</span>
+                      </p>
+                      <p className="text-xs text-black/50 dark:text-white/50 mt-1">
+                        Gå tillbaka till plagginformation för att ändra detta
+                      </p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: 'studio', name: 'Studio', desc: 'Studio lighting, ljusgrå bakgrund' },
+                      { id: 'urban', name: 'Stockholm', desc: 'Gator i Stockholm' }
+                    ].map((env) => (
+                      <button
+                        key={env.id}
+                        onClick={() => {
+                          setSelectedEnvironment(env.id);
+                          if (env.id !== 'custom') setCustomEnvironment('');
+                        }}
+                        disabled={selectedSeed && useSeedEnvironment}
+                        className={cn(
+                          "p-4 rounded-xl border-2 text-left transition-all",
+                          selectedSeed && useSeedEnvironment ? "opacity-50 cursor-not-allowed" : "",
+                          selectedEnvironment === env.id 
+                            ? "border-[#0071e3] bg-[#0071e3]/5" 
+                            : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                        )}
+                      >
+                        <p className="font-medium text-black dark:text-white">{env.name}</p>
+                        <p className="text-sm text-black/50 dark:text-white/50 mt-1">{env.desc}</p>
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setSelectedEnvironment('custom')}
+                      disabled={selectedSeed && useSeedEnvironment}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-left transition-all",
+                        selectedSeed && useSeedEnvironment ? "opacity-50 cursor-not-allowed" : "",
+                        selectedEnvironment === 'custom'
+                          ? "border-[#0071e3] bg-[#0071e3]/5" 
+                          : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                      )}
+                    >
+                      <p className="font-medium text-black dark:text-white">Valfri</p>
+                      <p className="text-sm text-black/50 dark:text-white/50 mt-1">Beskriv egen miljö</p>
+                    </button>
+                  </div>
+
+                  {/* Custom Environment Input */}
+                  {selectedEnvironment === 'custom' && (
+                    <div>
+                      <Label className="text-black/80 dark:text-white/80">Beskriv miljön</Label>
+                      <Textarea
+                        value={customEnvironment}
+                        onChange={(e) => setCustomEnvironment(e.target.value)}
+                        placeholder="T.ex. 'På en café med varmt ljus' eller 'I en bil, solnedgång'"
+                        className="mt-2 bg-[#f5f5f7] border-black/10 text-black min-h-[80px] dark:bg-white/5 dark:border-white/10 dark:text-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              </AccordionSection>
+            )}
+
             </>
           )}
 
@@ -1067,7 +1354,7 @@ export default function Upload() {
                   onSelectOutfit={(garments) => {
                     setSelectedGarments(garments);
                     setAiStylistSelected(true);
-                    setOpenSection('model');
+                    setOpenSectionWithScroll('model');
                   }}
                   initialSelectedGarments={selectedGarments}
                 />
@@ -1123,7 +1410,7 @@ export default function Upload() {
                     </div>
                   )}
                   <Button
-                    onClick={() => setOpenSection('model')}
+                    onClick={() => setOpenSectionWithScroll('model')}
                     disabled={selectedGarments.length < 2}
                     variant="outline"
                     className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
@@ -1135,8 +1422,8 @@ export default function Upload() {
             </>
           )}
 
-          {/* Upload Section */}
-          {mode !== 'style' && (
+          {/* Upload Section (not shown in batch mode - batch mode uses GarmentSelector) */}
+          {mode !== 'style' && mode !== 'batch' && (
             <AccordionSection id="upload" title="1. Ladda upp plagg" isComplete={!!uploadedUrl} openSection={openSection} setOpenSection={setOpenSection}>
               <FileDropzone
                 onFileSelect={handleFileSelect}
@@ -1170,7 +1457,7 @@ export default function Upload() {
                           });
                           setUploadedUrl(garment.image_url);
                           setPreview(garment.image_url);
-                          setOpenSection('details');
+                          setOpenSectionWithScroll('details');
 
                           // Always analyze to show description
                           await analyzeGarment(garment.image_url);
@@ -1490,7 +1777,7 @@ export default function Upload() {
                 </p>
 
                 <Button
-                  onClick={() => setOpenSection('model')}
+                  onClick={() => setOpenSectionWithScroll('model')}
                   variant="outline"
                   className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
                 >
@@ -1500,8 +1787,8 @@ export default function Upload() {
             </AccordionSection>
           )}
 
-          {/* Model Selection (Enkel/Batch/Style mode) */}
-          {(mode === 'enkel' || mode === 'batch' || (mode === 'style' && selectedGarments.length >= 2)) && (mode === 'batch' ? batchGarments.length > 0 : (mode !== 'style' ? garmentData.name : true)) && (
+          {/* Model Selection (Enkel/Style mode - Batch mode has its own section above) */}
+          {(mode === 'enkel' || (mode === 'style' && selectedGarments.length >= 2)) && (mode !== 'style' ? garmentData.name : true) && (
             <AccordionSection 
               id="model" 
               title="4. Välj modell" 
@@ -1539,6 +1826,7 @@ export default function Upload() {
                       onClick={() => {
                         setSelectedGender('female');
                         setSelectedModel(null);
+                        setOpenSectionWithScroll('environment');
                       }}
                       className={cn(
                         "p-4 rounded-xl border-2 text-left transition-all",
@@ -1554,6 +1842,7 @@ export default function Upload() {
                       onClick={() => {
                         setSelectedGender('male');
                         setSelectedModel(null);
+                        setOpenSectionWithScroll('environment');
                       }}
                       className={cn(
                         "p-4 rounded-xl border-2 text-left transition-all",
@@ -1569,6 +1858,7 @@ export default function Upload() {
                       onClick={() => {
                         setSelectedGender('child');
                         setSelectedModel(null);
+                        setOpenSectionWithScroll('environment');
                       }}
                       className={cn(
                         "p-4 rounded-xl border-2 text-left transition-all",
@@ -1596,7 +1886,7 @@ export default function Upload() {
                             onClick={() => {
                               setSelectedModel(model);
                               setSelectedGender(null);
-                              setOpenSection('environment');
+                              setOpenSectionWithScroll('environment');
                             }}
                             className={cn(
                               "aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all",
@@ -1615,20 +1905,12 @@ export default function Upload() {
                     </div>
                   </div>
                 )}
-                
-                <Button
-                  onClick={() => setOpenSection('environment')}
-                  variant="outline"
-                  className="w-full border-black/10 hover:bg-black/5"
-                >
-                  Fortsätt
-                </Button>
               </div>
             </AccordionSection>
           )}
 
-          {/* Environment Selection (Enkel/Batch/Style mode) */}
-          {(mode === 'enkel' || mode === 'batch' || mode === 'style') && (mode === 'batch' ? batchGarments.length > 0 : (mode !== 'style' ? garmentData.name : selectedGarments.length >= 2)) && (
+          {/* Environment Selection (Enkel/Style mode - Batch mode has its own section above) */}
+          {(mode === 'enkel' || mode === 'style') && (mode !== 'style' ? garmentData.name : selectedGarments.length >= 2) && (
             <AccordionSection id="environment" title="5. Välj miljö" isComplete={selectedEnvironment !== null} openSection={openSection} setOpenSection={setOpenSection}>
               <div className="space-y-3">
                 {selectedSeed && useSeedEnvironment && (
@@ -1734,6 +2016,13 @@ export default function Upload() {
                 <Save className="h-4 w-4 mr-2" />
                 Spara som mall
               </Button>
+            </div>
+          )}
+
+          {/* Batch Jobs List - only show at bottom in batch mode */}
+          {mode === 'batch' && (
+            <div className="mt-8">
+              <BatchJobsList hideHeader={true} showEmptyStateAtBottom={true} />
             </div>
           )}
         </div>

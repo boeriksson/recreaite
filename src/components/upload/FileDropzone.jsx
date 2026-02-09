@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Upload, X, Camera } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
-export default function FileDropzone({ onFileSelect, uploading, preview, onClear }) {
+export default function FileDropzone({ onFileSelect, uploading, preview, onClear, allowMultiple = false }) {
   const [isDragging, setIsDragging] = useState(false);
   const [showFullSize, setShowFullSize] = useState(false);
 
@@ -29,14 +29,26 @@ export default function FileDropzone({ onFileSelect, uploading, preview, onClear
     setIsDragging(false);
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
-      onFileSelect(files[0]);
+      if (allowMultiple) {
+        // Convert FileList to Array
+        const fileArray = Array.from(files);
+        onFileSelect(fileArray);
+      } else {
+        onFileSelect(files[0]);
+      }
     }
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onFileSelect(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      if (allowMultiple) {
+        // Convert FileList to Array
+        const fileArray = Array.from(files);
+        onFileSelect(fileArray);
+      } else {
+        onFileSelect(files[0]);
+      }
     }
   };
 
@@ -46,6 +58,7 @@ export default function FileDropzone({ onFileSelect, uploading, preview, onClear
         id="file-input"
         type="file"
         accept="image/*"
+        multiple={allowMultiple}
         onChange={handleFileChange}
         className="hidden"
       />
@@ -87,7 +100,11 @@ export default function FileDropzone({ onFileSelect, uploading, preview, onClear
                 </div>
                 <div className="text-left">
                   <p className="text-black dark:text-white text-sm font-medium">Dra och släpp eller klicka</p>
-                  <p className="text-black/50 dark:text-white/50 text-xs">för att välja en bild</p>
+                  <p className="text-black/50 dark:text-white/50 text-xs">
+                    {allowMultiple 
+                      ? 'för att välja bilder (Ctrl/Cmd+klick för flera)' 
+                      : 'för att välja en bild'}
+                  </p>
                 </div>
               </div>
             )}

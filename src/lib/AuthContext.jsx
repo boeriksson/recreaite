@@ -18,7 +18,16 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingAuth(true);
       const currentUser = await getCurrentUser();
-      const attributes = await fetchUserAttributes();
+      
+      // Only fetch attributes if we have a current user
+      // This avoids unnecessary Identity Pool credential requests for unauthenticated users
+      let attributes = {};
+      try {
+        attributes = await fetchUserAttributes();
+      } catch (attrError) {
+        // If fetching attributes fails, we still have a user, so continue with basic info
+        console.debug('Could not fetch user attributes:', attrError.message);
+      }
 
       setUser({
         id: currentUser.userId,
@@ -31,6 +40,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(null);
     } catch (error) {
       // Not authenticated - this is expected for guests
+      // Silently handle authentication errors
       setUser(null);
       setIsAuthenticated(false);
     } finally {

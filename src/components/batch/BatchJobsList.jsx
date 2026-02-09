@@ -36,7 +36,7 @@ import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 
-export default function BatchJobsList() {
+export default function BatchJobsList({ hideHeader = false, showEmptyStateAtBottom = false }) {
   const queryClient = useQueryClient();
   const [expandedJob, setExpandedJob] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -334,27 +334,29 @@ export default function BatchJobsList() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Selection Mode Toggle */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-black dark:text-white">
-          {selectionMode && selectedJobIds.length > 0
-            ? `${selectedJobIds.length} jobb valda`
-            : 'Befintliga batch-jobb'}
-        </h2>
-        {jobs.length > 0 && !showCreator && (
-          <Button
-            onClick={() => {
-              setSelectionMode(!selectionMode);
-              setSelectedJobIds([]);
-            }}
-            variant="outline"
-            size="sm"
-            className="border-black/20 dark:border-white/20"
-          >
-            {selectionMode ? 'Avbryt' : 'Välj flera'}
-          </Button>
-        )}
-      </div>
+      {/* Header with Selection Mode Toggle - hidden if hideHeader prop is true */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-black dark:text-white">
+            {selectionMode && selectedJobIds.length > 0
+              ? `${selectedJobIds.length} jobb valda`
+              : 'Befintliga batch-jobb'}
+          </h2>
+          {jobs.length > 0 && !showCreator && (
+            <Button
+              onClick={() => {
+                setSelectionMode(!selectionMode);
+                setSelectedJobIds([]);
+              }}
+              variant="outline"
+              size="sm"
+              className="border-black/20 dark:border-white/20"
+            >
+              {selectionMode ? 'Avbryt' : 'Välj flera'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Batch Actions */}
       {selectionMode && selectedJobIds.length > 0 && (
@@ -389,8 +391,8 @@ export default function BatchJobsList() {
         </motion.div>
       )}
 
-      {/* Create New Batch Job Button */}
-      {!showCreator && !selectionMode && (
+      {/* Create New Batch Job Button - hidden when hideHeader is true (used in main flow) */}
+      {!hideHeader && !showCreator && !selectionMode && (
         <div className="text-center py-8 bg-white dark:bg-white/5 rounded-2xl border border-black/10 dark:border-white/10">
           <h3 className="text-xl text-black dark:text-white mb-2">Skapa nytt batch-jobb</h3>
           <p className="text-black/60 dark:text-white/60 mb-4">
@@ -501,14 +503,6 @@ export default function BatchJobsList() {
           {[1, 2, 3].map(i => (
             <div key={i} className="h-32 bg-white/5 dark:bg-white/5 rounded-2xl animate-pulse" />
           ))}
-        </div>
-      ) : jobs.length === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-white/5 rounded-2xl border border-black/10 dark:border-white/10">
-          <Clock className="h-16 w-16 text-black/20 dark:text-white/20 mx-auto mb-4" />
-          <h2 className="text-xl text-black dark:text-white mb-2">Inga batch-jobb ännu</h2>
-          <p className="text-black/60 dark:text-white/60 mb-6">
-            Skapa ditt första batch-jobb för att generera flera bilder samtidigt
-          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -693,11 +687,22 @@ export default function BatchJobsList() {
                                 {isFailed && (
                                   <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-600 flex items-center justify-center">
                                     <XCircle className="h-3 w-3 text-white" />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+        </div>
+      )}
+
+      {/* Empty State at Bottom - only show when showEmptyStateAtBottom is true and there are no jobs */}
+      {showEmptyStateAtBottom && jobs.length === 0 && !isLoading && (
+        <div className="text-center py-16 bg-white dark:bg-white/5 rounded-2xl border border-black/10 dark:border-white/10">
+          <Clock className="h-16 w-16 text-black/20 dark:text-white/20 mx-auto mb-4" />
+          <h2 className="text-xl text-black dark:text-white mb-2">Inga batch-jobb ännu</h2>
+          <p className="text-black/60 dark:text-white/60 mb-6">
+            Skapa ditt första batch-jobb för att generera flera bilder samtidigt
+          </p>
+        </div>
+      )}
+    </div>
+  );
+})}
                         </div>
 
                         {job.error_log && job.error_log.length > 0 && (
