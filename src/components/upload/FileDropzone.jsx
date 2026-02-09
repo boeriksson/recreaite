@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, X, Camera } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { SignedImage } from '@/components/ui/SignedImage';
 
 export default function FileDropzone({ onFileSelect, uploading, preview, onClear, allowMultiple = false }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -123,7 +124,7 @@ export default function FileDropzone({ onFileSelect, uploading, preview, onClear
         <div className="relative rounded-xl overflow-hidden bg-[#f5f5f7] dark:bg-white/5">
           {!showFullSize ? (
             <>
-              <img 
+              <SignedImage 
                 src={preview} 
                 alt="Preview" 
                 className="w-full h-32 object-cover cursor-pointer"
@@ -141,7 +142,7 @@ export default function FileDropzone({ onFileSelect, uploading, preview, onClear
             </>
           ) : (
             <>
-              <img 
+              <SignedImage 
                 src={preview} 
                 alt="Preview" 
                 className="w-full aspect-square object-contain cursor-pointer"

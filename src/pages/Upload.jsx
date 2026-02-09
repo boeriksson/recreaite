@@ -207,6 +207,16 @@ export default function Upload() {
     }
   }, [mode]);
 
+  // Re-analyze garment when language changes (if image is already uploaded and analyzed)
+  React.useEffect(() => {
+    // Only re-analyze if we have an uploaded image and previous analysis exists
+    // This prevents re-analysis on initial load
+    if (uploadedUrl && aiSuggestions && !analyzing) {
+      analyzeGarment(uploadedUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [descriptionLanguage]);
+
   // Load garment or template from URL parameter
   React.useEffect(() => {
     const loadGarmentFromUrl = async () => {
@@ -1490,23 +1500,43 @@ export default function Upload() {
                     <button
                       onClick={() => setDescriptionLanguage('en')}
                       className={cn(
-                        "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                        "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2",
                         descriptionLanguage === 'en'
-                          ? "bg-[#392599] text-white"
-                          : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60"
+                          ? "bg-[#392599] text-white border-2 border-[#392599]"
+                          : "bg-white dark:bg-white/5 text-black/60 dark:text-white/60 border-2 border-black/10 dark:border-white/10 hover:border-[#392599]/50"
                       )}
                     >
+                      <div className={cn(
+                        "h-4 w-4 rounded border-2 flex items-center justify-center transition-all",
+                        descriptionLanguage === 'en'
+                          ? "border-white bg-white"
+                          : "border-black/30 dark:border-white/30 bg-transparent"
+                      )}>
+                        {descriptionLanguage === 'en' && (
+                          <Check className="h-3 w-3 text-[#392599]" />
+                        )}
+                      </div>
                       Generera på engelska
                     </button>
                     <button
                       onClick={() => setDescriptionLanguage('sv')}
                       className={cn(
-                        "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                        "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2",
                         descriptionLanguage === 'sv'
-                          ? "bg-[#392599] text-white"
-                          : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60"
+                          ? "bg-[#392599] text-white border-2 border-[#392599]"
+                          : "bg-white dark:bg-white/5 text-black/60 dark:text-white/60 border-2 border-black/10 dark:border-white/10 hover:border-[#392599]/50"
                       )}
                     >
+                      <div className={cn(
+                        "h-4 w-4 rounded border-2 flex items-center justify-center transition-all",
+                        descriptionLanguage === 'sv'
+                          ? "border-white bg-white"
+                          : "border-black/30 dark:border-white/30 bg-transparent"
+                      )}>
+                        {descriptionLanguage === 'sv' && (
+                          <Check className="h-3 w-3 text-[#392599]" />
+                        )}
+                      </div>
                       Generera på svenska
                     </button>
                   </div>
