@@ -303,8 +303,8 @@ export default function InviteLinks() {
                 {links.map((link) => (
                   <TableRow key={link.id}>
                     <TableCell>
-                      <code className="text-sm bg-muted px-2 py-1 rounded">
-                        {link.code}
+                      <code className="text-xs bg-muted px-2 py-1 rounded break-all max-w-[300px] block">
+                        {`${window.location.origin}/?invite=${link.code}`}
                       </code>
                     </TableCell>
                     <TableCell>
