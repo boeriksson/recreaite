@@ -20,6 +20,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import {
   Users,
   ArrowLeft,
   MoreHorizontal,
@@ -29,7 +45,8 @@ import {
   Eye,
   AlertTriangle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useCustomer } from '@/lib/CustomerContext';
 import { base44 } from '@/api/amplifyClient';
@@ -43,10 +60,32 @@ const ROLE_LABELS = {
 };
 
 export default function TeamMembers() {
-  const { userProfile, customer, canManageUsers } = useCustomer();
+  const { userProfile, customer, canManageUsers, isSuperAdmin } = useCustomer();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Move user dialog state
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [memberToMove, setMemberToMove] = useState(null);
+  const [allBrands, setAllBrands] = useState([]);
+  const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [moving, setMoving] = useState(false);
+
+  // Load all brands for super admin
+  const loadBrands = async () => {
+    if (!isSuperAdmin()) return;
+    try {
+      const brands = await base44.entities.Customer.list();
+      setAllBrands(brands);
+    } catch (err) {
+      console.error('Failed to load brands:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadBrands();
+  }, []);
 
   const loadMembers = async () => {
     if (!customer?.id) return;
@@ -104,6 +143,32 @@ export default function TeamMembers() {
     } catch (err) {
       console.error('Failed to reactivate user:', err);
       alert('Failed to reactivate user: ' + err.message);
+    }
+  };
+
+  const openMoveDialog = (member) => {
+    setMemberToMove(member);
+    setSelectedBrandId('');
+    setShowMoveDialog(true);
+  };
+
+  const handleMoveUser = async () => {
+    if (!memberToMove || !selectedBrandId) return;
+
+    setMoving(true);
+    try {
+      await base44.entities.UserProfile.update(memberToMove.id, {
+        customer_id: selectedBrandId,
+        role: 'member', // Reset to member when moving
+      });
+      setShowMoveDialog(false);
+      setMemberToMove(null);
+      await loadMembers();
+    } catch (err) {
+      console.error('Failed to move user:', err);
+      alert('Failed to move user: ' + err.message);
+    } finally {
+      setMoving(false);
     }
   };
 
@@ -245,6 +310,13 @@ export default function TeamMembers() {
                                 Make Viewer
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              {isSuperAdmin() && (
+                                <DropdownMenuItem onClick={() => openMoveDialog(member)}>
+                                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                  Move to Brand
+                                </DropdownMenuItem>
+                              )}
+                              {isSuperAdmin() && <DropdownMenuSeparator />}
                               {member.status === 'suspended' ? (
                                 <DropdownMenuItem onClick={() => handleReactivate(member.id)}>
                                   Reactivate
@@ -269,6 +341,52 @@ export default function TeamMembers() {
           )}
         </CardContent>
       </Card>
+
+      {/* Move User Dialog */}
+      <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move User to Another Brand</DialogTitle>
+            <DialogDescription>
+              Move {memberToMove?.display_name || memberToMove?.email} to a different brand.
+              They will become a member of the new brand.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="text-sm font-medium">Select Brand</Label>
+            <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Choose a brand..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allBrands
+                  .filter(b => b.id !== customer?.id)
+                  .map(brand => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name} ({brand.slug})
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMoveDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMoveUser} disabled={!selectedBrandId || moving}>
+              {moving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Moving...
+                </>
+              ) : (
+                'Move User'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
