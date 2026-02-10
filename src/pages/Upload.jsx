@@ -199,7 +199,7 @@ export default function Upload() {
   // Set default open section based on mode (without scrolling on initial tab selection)
   React.useEffect(() => {
     if (mode === 'style') {
-      setOpenSection('ai-styling');
+      setOpenSection('style-garments');
     } else if (mode === 'batch') {
       setOpenSection('batch-garments');
     } else {
@@ -502,7 +502,7 @@ export default function Upload() {
 
   const handleFileSelect = async (selectedFile) => {
     // Batch mode: upload and add to batchGarments
-    if (mode === 'batch') {
+    if (mode === 'batch' || mode === 'style') {
       setUploading(true);
       try {
         // Handle both single file and multiple files
@@ -542,12 +542,17 @@ export default function Upload() {
           }
         }
 
-        // Add all new garments to batch garments
+        // Add all new garments to batch garments or selected garments
         if (newGarments.length > 0) {
-          setBatchGarments([...batchGarments, ...newGarments]);
+          if (mode === 'batch') {
+            setBatchGarments([...batchGarments, ...newGarments]);
+          } else if (mode === 'style') {
+            setSelectedGarments([...selectedGarments, ...newGarments]);
+            setAiStylistSelected(false); // User manually selected, not AI-styled
+          }
         }
       } catch (error) {
-        console.error('Batch upload failed:', error);
+        console.error('Upload failed:', error);
       } finally {
         setUploading(false);
       }
@@ -1341,36 +1346,77 @@ export default function Upload() {
             </>
           )}
 
-          {/* Style Mode: AI Styling and Manual Selection */}
+          {/* Style Mode: Garment Selection */}
           {mode === 'style' && (
             <>
-              <AccordionSection
-                id="ai-styling"
-                title={selectedGarments.length >= 2 && aiStylistSelected ? `1. ${t.aiStyling || 'AI Styling'} (${selectedGarments.length} plagg)` : `1. ${t.aiStyling || 'AI Styling'}`}
-                isComplete={selectedGarments.length >= 2 && aiStylistSelected}
-                openSection={openSection}
+              <AccordionSection 
+                id="style-garments" 
+                title="1. Välj plagg för AI styling" 
+                isComplete={selectedGarments.length >= 2} 
+                openSection={openSection} 
                 setOpenSection={setOpenSection}
-                thumbnail={selectedGarments.length > 0 && aiStylistSelected ? (
-                  <div className="w-full h-full flex items-center justify-center gap-0.5 bg-[#392599]/10">
-                    {selectedGarments.slice(0, 2).map((g, idx) => (
-                      <SignedImage key={idx} src={g.image_url} alt={g.name} className="w-1/2 h-full object-cover" />
-                    ))}
-                  </div>
-                ) : null}
               >
-                <AIStylist
-                  allGarments={allGarments}
-                  brandSeed={selectedSeed}
-                  onSelectOutfit={(garments) => {
-                    setSelectedGarments(garments);
-                    setAiStylistSelected(true);
-                    setOpenSectionWithScroll('model');
+                <GarmentSelector
+                  onFileSelect={handleFileSelect}
+                  onGarmentSelect={(garment) => {
+                    setSelectedGarments([...selectedGarments, garment]);
+                    setAiStylistSelected(false); // User manually selected
                   }}
-                  initialSelectedGarments={selectedGarments}
+                  onGarmentDeselect={(garmentId) => {
+                    setSelectedGarments(selectedGarments.filter(g => g.id !== garmentId));
+                  }}
+                  allGarments={allGarments}
+                  selectedGarments={selectedGarments}
+                  allowMultiple={true}
+                  uploading={uploading}
+                  preview={null}
+                  onClear={() => {}}
                 />
+                
+                {selectedGarments.length >= 2 && (
+                  <div className="mt-6">
+                    <Button
+                      onClick={() => setOpenSectionWithScroll('ai-styling')}
+                      variant="outline"
+                      className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+                    >
+                      Fortsätt
+                    </Button>
+                  </div>
+                )}
               </AccordionSection>
 
-              <AccordionSection id="manual-garments" title={`2. ${t.selectGarmentsManually || 'Välj plagg manuellt'}`} isComplete={selectedGarments.length >= 2 && !aiStylistSelected} openSection={openSection} setOpenSection={setOpenSection}>
+              {/* AI Styling Suggestions - only show if garments are selected */}
+              {selectedGarments.length >= 2 && (
+                <AccordionSection
+                  id="ai-styling"
+                  title={`2. ${t.aiStyling || 'AI Styling'} (${selectedGarments.length} plagg)`}
+                  isComplete={selectedGarments.length >= 2 && aiStylistSelected}
+                  openSection={openSection}
+                  setOpenSection={setOpenSection}
+                  thumbnail={selectedGarments.length > 0 && aiStylistSelected ? (
+                    <div className="w-full h-full flex items-center justify-center gap-0.5 bg-[#392599]/10">
+                      {selectedGarments.slice(0, 2).map((g, idx) => (
+                        <SignedImage key={idx} src={g.image_url} alt={g.name} className="w-1/2 h-full object-cover" />
+                      ))}
+                    </div>
+                  ) : null}
+                >
+                  <AIStylist
+                    allGarments={allGarments}
+                    brandSeed={selectedSeed}
+                    onSelectOutfit={(garments) => {
+                      setSelectedGarments(garments);
+                      setAiStylistSelected(true);
+                      setOpenSectionWithScroll('model');
+                    }}
+                    initialSelectedGarments={selectedGarments}
+                    autoStart={openSection === 'ai-styling'}
+                  />
+                </AccordionSection>
+              )}
+
+              <AccordionSection id="manual-garments" title={`${selectedGarments.length >= 2 ? '3' : '2'}. ${t.selectGarmentsManually || 'Välj plagg manuellt'}`} isComplete={selectedGarments.length >= 2 && !aiStylistSelected} openSection={openSection} setOpenSection={setOpenSection}>
                 <div className="space-y-4">
                   <p className="text-sm text-black/60 dark:text-white/60">{language === 'sv' ? 'Välj minst 2 plagg att kombinera' : 'Select at least 2 garments to combine'}</p>
                   <div className="grid grid-cols-3 md:grid-cols-4 gap-3">

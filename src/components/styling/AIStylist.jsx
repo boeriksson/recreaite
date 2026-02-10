@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/amplifyClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,14 @@ export default function AIStylist({
   allGarments,
   brandSeed,
   onSelectOutfit,
-  initialSelectedGarments = []
+  initialSelectedGarments = [],
+  autoStart = false
 }) {
   const { t } = useLanguage();
   const [analyzing, setAnalyzing] = useState(false);
   const [outfitSuggestions, setOutfitSuggestions] = useState([]);
   const [selectedOutfit, setSelectedOutfit] = useState(null);
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
   const analyzeAndSuggest = async () => {
     setAnalyzing(true);
@@ -156,6 +158,15 @@ För varje outfit, förklara kort varför plaggen passar ihop.`;
     setSelectedOutfit(outfit);
     onSelectOutfit(outfit.garments);
   };
+
+  // Auto-start analysis when section opens and garments are available
+  useEffect(() => {
+    if (autoStart && !hasAutoStarted && initialSelectedGarments.length >= 2 && allGarments.length >= 2 && !analyzing && outfitSuggestions.length === 0) {
+      setHasAutoStarted(true);
+      analyzeAndSuggest();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, initialSelectedGarments.length, allGarments.length]);
 
   return (
     <div className="space-y-6">
