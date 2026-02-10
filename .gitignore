@@ -32,3 +32,6 @@ amplify-meta.json
 aws-exports.js
 heylook.zip
 heylook2.zip
+
+# Secrets backup (sensitive!)
+.secrets-backup.json

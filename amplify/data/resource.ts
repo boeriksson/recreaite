@@ -1,12 +1,17 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
 // Import all models from separate files
+// Multi-tenant entities
+import { Customer } from './models/Customer';
+import { UserProfile } from './models/UserProfile';
+import { UsageCost } from './models/UsageCost';
+import { InviteLink } from './models/InviteLink';
+// Content entities
 import { GeneratedImage } from './models/GeneratedImage';
 import { Garment } from './models/Garment';
 import { Collection } from './models/Collection';
 import { BatchJob } from './models/BatchJob';
 import { Model } from './models/Model';
-import { UserSubscription } from './models/UserSubscription';
 import { Template } from './models/Template';
 import { BrandSeed } from './models/BrandSeed';
 import { CustomModel } from './models/CustomModel';
@@ -23,14 +28,24 @@ import { ActivityLog } from './models/ActivityLog';
  * - owner: Full CRUD for the record creator
  * - authenticated: Access for logged-in users
  * - guest: Read-only access for public data
+ *
+ * Multi-tenancy:
+ * - Customer: Brand/company entity - primary billing and isolation unit
+ * - UserProfile: Links Cognito users to customers with roles
+ * - All content entities have customer_id for tenant isolation
  */
 const schema = a.schema({
+  // Multi-tenant entities
+  Customer,
+  UserProfile,
+  UsageCost,
+  InviteLink,
+  // Content entities
   GeneratedImage,
   Garment,
   Collection,
   BatchJob,
   Model,
-  UserSubscription,
   Template,
   BrandSeed,
   CustomModel,

@@ -6,6 +6,7 @@ import { a } from '@aws-amplify/backend';
  * for organizing their generated fashion images.
  */
 export const Collection = a.model({
+  customer_id: a.string().required(),  // FK to Customer
   name: a.string().required(),
   description: a.string(),
   color: a.string(),

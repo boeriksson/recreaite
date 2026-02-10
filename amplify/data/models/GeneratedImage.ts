@@ -6,6 +6,7 @@ import { a } from '@aws-amplify/backend';
  * collection organization, and tagging support.
  */
 export const GeneratedImage = a.model({
+  customer_id: a.string().required(),  // FK to Customer
   status: a.enum(['pending', 'processing', 'completed', 'failed']),
   image_url: a.string(),
   garment_id: a.string(),

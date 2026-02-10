@@ -6,6 +6,7 @@ import { a } from '@aws-amplify/backend';
  * including visual style, color palette, and photography preferences.
  */
 export const BrandSeed = a.model({
+  customer_id: a.string().required(),  // FK to Customer
   name: a.string().required(),
   domain: a.string(),
   brand_style: a.string(),
