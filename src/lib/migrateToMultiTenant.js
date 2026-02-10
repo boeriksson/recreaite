@@ -204,16 +204,27 @@ export async function checkMigrationStatus() {
     // Check each model for records without customer_id
     for (const modelName of CONTENT_MODELS) {
       const model = client.models[modelName];
-      if (!model) continue;
+      if (!model) {
+        status.recordsNeedingMigration[modelName] = { error: 'Model not found in schema' };
+        continue;
+      }
 
       try {
-        const { data: records } = await model.list();
+        const { data: records, errors } = await model.list();
+        if (errors && errors.length > 0) {
+          console.error(`${modelName} list errors:`, errors);
+          status.recordsNeedingMigration[modelName] = {
+            error: errors[0]?.message || 'Unknown error'
+          };
+          continue;
+        }
         const needsUpdate = records?.filter(r => !r.customer_id) || [];
         status.recordsNeedingMigration[modelName] = {
           total: records?.length || 0,
           needsUpdate: needsUpdate.length,
         };
       } catch (e) {
+        console.error(`${modelName} exception:`, e);
         status.recordsNeedingMigration[modelName] = { error: e.message };
       }
     }
