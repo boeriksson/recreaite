@@ -4,6 +4,9 @@ import { base44, setCustomerContext } from '@/api/amplifyClient';
 
 const CustomerContext = createContext();
 
+// Key for storing invite code in sessionStorage
+const INVITE_CODE_KEY = 'pending_invite_code';
+
 // Permission definitions by role
 const ROLE_PERMISSIONS = {
   owner: {
@@ -63,6 +66,69 @@ export const CustomerProvider = ({ children }) => {
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(true);
   const [customerError, setCustomerError] = useState(null);
 
+  // Capture invite code from URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteCode = urlParams.get('invite');
+    if (inviteCode) {
+      console.log('Storing invite code:', inviteCode);
+      sessionStorage.setItem(INVITE_CODE_KEY, inviteCode);
+      // Clean up URL (remove invite param)
+      urlParams.delete('invite');
+      const newUrl = urlParams.toString()
+        ? `${window.location.pathname}?${urlParams.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
+  // Validate and consume an invite code
+  const consumeInviteCode = useCallback(async (code) => {
+    try {
+      console.log('Looking up invite code:', code);
+
+      // Find invite by code
+      const invites = await base44.entities.InviteLink.filter({ code });
+      const invite = invites[0];
+
+      if (!invite) {
+        console.log('Invite code not found');
+        return null;
+      }
+
+      // Validate invite
+      if (invite.status !== 'active') {
+        console.log('Invite is not active:', invite.status);
+        return null;
+      }
+
+      if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+        console.log('Invite has expired');
+        return null;
+      }
+
+      if (invite.max_uses && invite.use_count >= invite.max_uses) {
+        console.log('Invite has reached max uses');
+        return null;
+      }
+
+      // Increment use count
+      await base44.entities.InviteLink.update(invite.id, {
+        use_count: (invite.use_count || 0) + 1,
+      });
+
+      console.log('Invite validated, customer_id:', invite.customer_id, 'role:', invite.role);
+      return {
+        customer_id: invite.customer_id,
+        role: invite.role,
+        invited_by: invite.created_by,
+      };
+    } catch (error) {
+      console.error('Error consuming invite code:', error);
+      return null;
+    }
+  }, []);
+
   // Create default customer (called when no customer exists)
   const createDefaultCustomer = useCallback(async () => {
     console.log('Creating Default customer...');
@@ -82,16 +148,23 @@ export const CustomerProvider = ({ children }) => {
   }, []);
 
   // Create user profile for the current user
-  const createUserProfile = useCallback(async (customerId, isFirstUser) => {
-    console.log('Creating UserProfile for user:', user?.id, 'isFirstUser:', isFirstUser);
+  const createUserProfile = useCallback(async (customerId, options = {}) => {
+    const {
+      isFirstUser = false,
+      role = isFirstUser ? 'owner' : 'member',
+      invited_by = null,
+    } = options;
+
+    console.log('Creating UserProfile for user:', user?.id, 'isFirstUser:', isFirstUser, 'role:', role);
     const newProfile = await base44.entities.UserProfile.create({
       cognito_sub: user.id,
       email: user.email,
       display_name: user.full_name || user.email,
       customer_id: customerId,
       is_super_admin: isFirstUser, // First user is super admin
-      role: isFirstUser ? 'owner' : 'member', // First user is owner
+      role: role,
       status: 'active',
+      invited_by: invited_by,
       joined_at: new Date().toISOString(),
       last_active_at: new Date().toISOString(),
     });
@@ -124,23 +197,56 @@ export const CustomerProvider = ({ children }) => {
 
       if (!profile) {
         // No profile found - need to set up user
-        console.log('No UserProfile found, checking for existing customers...');
+        console.log('No UserProfile found, checking for invite code...');
 
-        // Check if any customer exists
-        const customers = await base44.entities.Customer.list();
+        // Check for pending invite code
+        const pendingInviteCode = sessionStorage.getItem(INVITE_CODE_KEY);
+        let inviteData = null;
 
-        if (customers.length === 0) {
-          // No customers exist - this is a fresh database
-          // Create Default customer and make this user the super admin + owner
-          console.log('No customers found - creating Default customer and first user as super admin');
-          customerData = await createDefaultCustomer();
-          profile = await createUserProfile(customerData.id, true);
-        } else {
-          // Customers exist - add user to Default customer as member
-          // Find the Default customer or use the first one
-          customerData = customers.find(c => c.slug === 'default') || customers[0];
-          console.log('Found existing customer:', customerData.name, '- creating user as member');
-          profile = await createUserProfile(customerData.id, false);
+        if (pendingInviteCode) {
+          console.log('Found pending invite code:', pendingInviteCode);
+          inviteData = await consumeInviteCode(pendingInviteCode);
+          // Clear the invite code from storage (whether valid or not)
+          sessionStorage.removeItem(INVITE_CODE_KEY);
+        }
+
+        if (inviteData) {
+          // User is joining via invite link
+          console.log('User joining via invite, customer_id:', inviteData.customer_id, 'role:', inviteData.role);
+          try {
+            customerData = await base44.entities.Customer.get(inviteData.customer_id);
+            profile = await createUserProfile(customerData.id, {
+              isFirstUser: false,
+              role: inviteData.role,
+              invited_by: inviteData.invited_by,
+            });
+          } catch (err) {
+            console.error('Failed to load customer from invite:', err);
+            // Fall through to default behavior
+            inviteData = null;
+          }
+        }
+
+        if (!inviteData) {
+          // No valid invite - use default behavior
+          console.log('No valid invite, checking for existing customers...');
+
+          // Check if any customer exists
+          const customers = await base44.entities.Customer.list();
+
+          if (customers.length === 0) {
+            // No customers exist - this is a fresh database
+            // Create Default customer and make this user the super admin + owner
+            console.log('No customers found - creating Default customer and first user as super admin');
+            customerData = await createDefaultCustomer();
+            profile = await createUserProfile(customerData.id, { isFirstUser: true });
+          } else {
+            // Customers exist - add user to Default customer as member
+            // Find the Default customer or use the first one
+            customerData = customers.find(c => c.slug === 'default') || customers[0];
+            console.log('Found existing customer:', customerData.name, '- creating user as member');
+            profile = await createUserProfile(customerData.id, { isFirstUser: false });
+          }
         }
       } else {
         // Profile exists - load the customer
