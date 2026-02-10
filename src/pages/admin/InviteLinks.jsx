@@ -96,7 +96,7 @@ export default function InviteLinks() {
   const handleCreateLink = async () => {
     setCreating(true);
     try {
-      const expiresAt = newLinkExpiresDays
+      const expiresAt = newLinkExpiresDays && newLinkExpiresDays !== 'never'
         ? new Date(Date.now() + parseInt(newLinkExpiresDays) * 24 * 60 * 60 * 1000).toISOString()
         : null;
 
@@ -241,7 +241,7 @@ export default function InviteLinks() {
                       <SelectItem value="1">1 day</SelectItem>
                       <SelectItem value="7">7 days</SelectItem>
                       <SelectItem value="30">30 days</SelectItem>
-                      <SelectItem value="">Never</SelectItem>
+                      <SelectItem value="never">Never</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
