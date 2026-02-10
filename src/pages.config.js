@@ -19,7 +19,7 @@ import Admin from './pages/admin/Admin';
 import DataMigration from './pages/admin/DataMigration';
 import TeamMembers from './pages/admin/TeamMembers';
 import InviteLinks from './pages/admin/InviteLinks';
-import Brands from './pages/admin/Brands';
+import Customers from './pages/admin/Customers';
 import CostDashboard from './pages/admin/CostDashboard';
 import __Layout from './Layout.jsx';
 
@@ -40,7 +40,7 @@ export const PAGES = {
     "admin/data-migration": DataMigration,
     "admin/team-members": TeamMembers,
     "admin/invite-links": InviteLinks,
-    "admin/brands": Brands,
+    "admin/customers": Customers,
     "admin/cost-dashboard": CostDashboard,
 }
 

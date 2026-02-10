@@ -185,7 +185,7 @@ export default function InviteLinks() {
               Invite Links
             </h1>
             <p className="text-muted-foreground">
-              Create shareable links to invite users to {customer?.name || 'your brand'}
+              Create shareable links to invite users to {customer?.name || 'your organization'}
             </p>
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function InviteLinks() {
               <DialogHeader>
                 <DialogTitle>Create Invite Link</DialogTitle>
                 <DialogDescription>
-                  Generate a link that new users can use to join your brand.
+                  Generate a link that new users can use to join your organization.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -285,7 +285,7 @@ export default function InviteLinks() {
             <div className="text-center py-12 text-muted-foreground">
               <LinkIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No invite links yet</p>
-              <p className="text-sm">Create a link to invite users to your brand</p>
+              <p className="text-sm">Create a link to invite users to your organization</p>
             </div>
           ) : (
             <Table>

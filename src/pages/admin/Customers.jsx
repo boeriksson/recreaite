@@ -43,31 +43,31 @@ import { useCustomer } from '@/lib/CustomerContext';
 import { base44 } from '@/api/amplifyClient';
 import { createPageUrl } from '@/utils';
 
-export default function Brands() {
+export default function Customers() {
   const { isSuperAdmin } = useCustomer();
-  const [brands, setBrands] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Form state
-  const [newBrandName, setNewBrandName] = useState('');
-  const [newBrandSlug, setNewBrandSlug] = useState('');
-  const [newBrandPlan, setNewBrandPlan] = useState('free');
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerSlug, setNewCustomerSlug] = useState('');
+  const [newCustomerPlan, setNewCustomerPlan] = useState('free');
 
-  const loadBrands = async () => {
+  const loadCustomers = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Super admin can see all brands - bypass customer filtering
-      const allBrands = await base44.entities.Customer.list();
-      setBrands(allBrands.sort((a, b) =>
+      // Super admin can see all customers - bypass customer filtering
+      const allCustomers = await base44.entities.Customer.list();
+      setCustomers(allCustomers.sort((a, b) =>
         new Date(b.createdAt) - new Date(a.createdAt)
       ));
     } catch (err) {
-      console.error('Failed to load brands:', err);
+      console.error('Failed to load customers:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -75,11 +75,11 @@ export default function Brands() {
   };
 
   useEffect(() => {
-    loadBrands();
+    loadCustomers();
   }, []);
 
-  const handleCreateBrand = async () => {
-    if (!newBrandName || !newBrandSlug) {
+  const handleCreateCustomer = async () => {
+    if (!newCustomerName || !newCustomerSlug) {
       alert('Please fill in all required fields');
       return;
     }
@@ -89,11 +89,11 @@ export default function Brands() {
       const limits = { free: 100, starter: 500, pro: 2000, enterprise: -1 };
 
       await base44.entities.Customer.create({
-        name: newBrandName,
-        slug: newBrandSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        plan: newBrandPlan,
+        name: newCustomerName,
+        slug: newCustomerSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        plan: newCustomerPlan,
         plan_started_at: new Date().toISOString(),
-        images_limit_monthly: limits[newBrandPlan] || 100,
+        images_limit_monthly: limits[newCustomerPlan] || 100,
         storage_limit_gb: 10,
         images_generated_this_month: 0,
         usage_reset_date: new Date().toISOString(),
@@ -101,13 +101,13 @@ export default function Brands() {
       });
 
       setShowCreateDialog(false);
-      setNewBrandName('');
-      setNewBrandSlug('');
-      setNewBrandPlan('free');
-      await loadBrands();
+      setNewCustomerName('');
+      setNewCustomerSlug('');
+      setNewCustomerPlan('free');
+      await loadCustomers();
     } catch (err) {
-      console.error('Failed to create brand:', err);
-      alert('Failed to create brand: ' + err.message);
+      console.error('Failed to create customer:', err);
+      alert('Failed to create customer: ' + err.message);
     } finally {
       setCreating(false);
     }
@@ -139,7 +139,7 @@ export default function Brands() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Access denied. Only super admins can manage brands.
+            Access denied. Only super admins can manage customers.
           </AlertDescription>
         </Alert>
       </div>
@@ -159,15 +159,15 @@ export default function Brands() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
-              Brands
+              Customers
             </h1>
             <p className="text-muted-foreground">
-              Manage all brands in the system
+              Manage all customers in the system
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={loadBrands} disabled={loading}>
+          <Button variant="outline" onClick={loadCustomers} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -175,26 +175,26 @@ export default function Brands() {
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Brand
+                Create Customer
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Brand</DialogTitle>
+                <DialogTitle>Create New Customer</DialogTitle>
                 <DialogDescription>
-                  Create a new brand/customer account.
+                  Create a new customer account.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Brand Name *</Label>
+                  <Label>Customer Name *</Label>
                   <Input
                     placeholder="Acme Fashion"
-                    value={newBrandName}
+                    value={newCustomerName}
                     onChange={(e) => {
-                      setNewBrandName(e.target.value);
-                      if (!newBrandSlug) {
-                        setNewBrandSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+                      setNewCustomerName(e.target.value);
+                      if (!newCustomerSlug) {
+                        setNewCustomerSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
                       }
                     }}
                   />
@@ -203,8 +203,8 @@ export default function Brands() {
                   <Label>Slug *</Label>
                   <Input
                     placeholder="acme-fashion"
-                    value={newBrandSlug}
-                    onChange={(e) => setNewBrandSlug(e.target.value)}
+                    value={newCustomerSlug}
+                    onChange={(e) => setNewCustomerSlug(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
                     URL-safe identifier (lowercase, no spaces)
@@ -212,7 +212,7 @@ export default function Brands() {
                 </div>
                 <div className="space-y-2">
                   <Label>Plan</Label>
-                  <Select value={newBrandPlan} onValueChange={setNewBrandPlan}>
+                  <Select value={newCustomerPlan} onValueChange={setNewCustomerPlan}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -229,14 +229,14 @@ export default function Brands() {
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreateBrand} disabled={creating}>
+                <Button onClick={handleCreateCustomer} disabled={creating}>
                   {creating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Creating...
                     </>
                   ) : (
-                    'Create Brand'
+                    'Create Customer'
                   )}
                 </Button>
               </DialogFooter>
@@ -253,23 +253,23 @@ export default function Brands() {
         </Alert>
       )}
 
-      {/* Brands Table */}
+      {/* Customers Table */}
       <Card>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : brands.length === 0 ? (
+          ) : customers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No brands found</p>
+              <p>No customers found</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Brand</TableHead>
+                  <TableHead>Customer</TableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Status</TableHead>
@@ -278,35 +278,35 @@ export default function Brands() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {brands.map((brand) => (
-                  <TableRow key={brand.id}>
+                {customers.map((cust) => (
+                  <TableRow key={cust.id}>
                     <TableCell>
-                      <div className="font-medium">{brand.name}</div>
-                      {brand.domain && (
-                        <div className="text-sm text-muted-foreground">{brand.domain}</div>
+                      <div className="font-medium">{cust.name}</div>
+                      {cust.domain && (
+                        <div className="text-sm text-muted-foreground">{cust.domain}</div>
                       )}
                     </TableCell>
                     <TableCell>
                       <code className="text-sm bg-muted px-2 py-1 rounded">
-                        {brand.slug}
+                        {cust.slug}
                       </code>
                     </TableCell>
-                    <TableCell>{getPlanBadge(brand.plan)}</TableCell>
-                    <TableCell>{getStatusBadge(brand.status)}</TableCell>
+                    <TableCell>{getPlanBadge(cust.plan)}</TableCell>
+                    <TableCell>{getStatusBadge(cust.status)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <Image className="h-3 w-3" />
-                        {brand.images_generated_this_month || 0}
-                        {brand.images_limit_monthly !== -1 && (
+                        {cust.images_generated_this_month || 0}
+                        {cust.images_limit_monthly !== -1 && (
                           <span className="text-muted-foreground">
-                            / {brand.images_limit_monthly}
+                            / {cust.images_limit_monthly}
                           </span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {brand.createdAt
-                        ? new Date(brand.createdAt).toLocaleDateString()
+                      {cust.createdAt
+                        ? new Date(cust.createdAt).toLocaleDateString()
                         : '-'}
                     </TableCell>
                   </TableRow>

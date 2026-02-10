@@ -68,23 +68,23 @@ export default function TeamMembers() {
   // Move user dialog state
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [memberToMove, setMemberToMove] = useState(null);
-  const [allBrands, setAllBrands] = useState([]);
-  const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [moving, setMoving] = useState(false);
 
-  // Load all brands for super admin
-  const loadBrands = async () => {
+  // Load all customers for super admin
+  const loadCustomers = async () => {
     if (!isSuperAdmin()) return;
     try {
-      const brands = await base44.entities.Customer.list();
-      setAllBrands(brands);
+      const customers = await base44.entities.Customer.list();
+      setAllCustomers(customers);
     } catch (err) {
-      console.error('Failed to load brands:', err);
+      console.error('Failed to load customers:', err);
     }
   };
 
   useEffect(() => {
-    loadBrands();
+    loadCustomers();
   }, []);
 
   const loadMembers = async () => {
@@ -148,17 +148,17 @@ export default function TeamMembers() {
 
   const openMoveDialog = (member) => {
     setMemberToMove(member);
-    setSelectedBrandId('');
+    setSelectedCustomerId('');
     setShowMoveDialog(true);
   };
 
   const handleMoveUser = async () => {
-    if (!memberToMove || !selectedBrandId) return;
+    if (!memberToMove || !selectedCustomerId) return;
 
     setMoving(true);
     try {
       await base44.entities.UserProfile.update(memberToMove.id, {
-        customer_id: selectedBrandId,
+        customer_id: selectedCustomerId,
         role: 'member', // Reset to member when moving
       });
       setShowMoveDialog(false);
@@ -313,7 +313,7 @@ export default function TeamMembers() {
                               {isSuperAdmin() && (
                                 <DropdownMenuItem onClick={() => openMoveDialog(member)}>
                                   <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                  Move to Brand
+                                  Move to Customer
                                 </DropdownMenuItem>
                               )}
                               {isSuperAdmin() && <DropdownMenuSeparator />}
@@ -346,24 +346,24 @@ export default function TeamMembers() {
       <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Move User to Another Brand</DialogTitle>
+            <DialogTitle>Move User to Another Customer</DialogTitle>
             <DialogDescription>
-              Move {memberToMove?.display_name || memberToMove?.email} to a different brand.
-              They will become a member of the new brand.
+              Move {memberToMove?.display_name || memberToMove?.email} to a different customer.
+              They will become a member of the new organization.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label className="text-sm font-medium">Select Brand</Label>
-            <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
+            <Label className="text-sm font-medium">Select Customer</Label>
+            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
               <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Choose a brand..." />
+                <SelectValue placeholder="Choose a customer..." />
               </SelectTrigger>
               <SelectContent>
-                {allBrands
-                  .filter(b => b.id !== customer?.id)
-                  .map(brand => (
-                    <SelectItem key={brand.id} value={brand.id}>
-                      {brand.name} ({brand.slug})
+                {allCustomers
+                  .filter(c => c.id !== customer?.id)
+                  .map(cust => (
+                    <SelectItem key={cust.id} value={cust.id}>
+                      {cust.name} ({cust.slug})
                     </SelectItem>
                   ))
                 }
@@ -374,7 +374,7 @@ export default function TeamMembers() {
             <Button variant="outline" onClick={() => setShowMoveDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleMoveUser} disabled={!selectedBrandId || moving}>
+            <Button onClick={handleMoveUser} disabled={!selectedCustomerId || moving}>
               {moving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

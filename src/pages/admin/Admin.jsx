@@ -74,7 +74,7 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Brand Management - Owner/Admin */}
+      {/* Team Management - Owner/Admin */}
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Team Management
@@ -84,7 +84,7 @@ export default function Admin() {
             to={createPageUrl('admin/team-members')}
             icon={Users}
             title="Team Members"
-            description="View and manage users in your brand"
+            description="View and manage users in your organization"
           />
           <AdminCard
             to={createPageUrl('admin/invite-links')}
@@ -120,10 +120,10 @@ export default function Admin() {
           </h2>
           <div className="grid gap-3">
             <AdminCard
-              to={createPageUrl('admin/brands')}
+              to={createPageUrl('admin/customers')}
               icon={Building2}
-              title="Brands"
-              description="Create and manage all brands"
+              title="Customers"
+              description="Create and manage all customers"
               badge="Super Admin"
             />
             <AdminCard
