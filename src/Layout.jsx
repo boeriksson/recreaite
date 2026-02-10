@@ -14,7 +14,8 @@ import {
   Sparkles,
   User,
   LogOut,
-  CreditCard
+  CreditCard,
+  Database
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
@@ -31,7 +32,7 @@ import FloatingGenerationBar from './components/generation/FloatingGenerationBar
 
 export default function Layout({ children, currentPageName }) {
   const { user, isAuthenticated, logout } = useAuth();
-  const { customer, refreshCustomerData } = useCustomer();
+  const { customer, refreshCustomerData, userProfile } = useCustomer();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -147,6 +148,17 @@ export default function Layout({ children, currentPageName }) {
                       <CreditCard className="h-4 w-4 mr-2" />
                       Uppgradera plan
                     </DropdownMenuItem>
+                    {userProfile?.is_super_admin && (
+                      <>
+                        <DropdownMenuSeparator className={darkMode ? "bg-white/10" : "bg-black/10"} />
+                        <Link to={createPageUrl('admin/data-migration')}>
+                          <DropdownMenuItem className={darkMode ? "text-white" : "text-black"}>
+                            <Database className="h-4 w-4 mr-2" />
+                            Data Migration
+                          </DropdownMenuItem>
+                        </Link>
+                      </>
+                    )}
                     <DropdownMenuItem onClick={() => logout()} className={darkMode ? "text-white" : "text-black"}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Logga ut

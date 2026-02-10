@@ -14,6 +14,8 @@ import Templates from './pages/Templates';
 import Upload from './pages/Upload';
 import UploadGarment from './pages/UploadGarment';
 import VideoGenerator from './pages/VideoGenerator';
+// Admin pages
+import DataMigration from './pages/admin/DataMigration';
 import __Layout from './Layout.jsx';
 
 export const PAGES = {
@@ -28,6 +30,8 @@ export const PAGES = {
     "Upload": Upload,
     "UploadGarment": UploadGarment,
     "VideoGenerator": VideoGenerator,
+    // Admin pages
+    "admin/data-migration": DataMigration,
 }
 
 export const pagesConfig = {
