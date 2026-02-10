@@ -6,7 +6,7 @@ import { a } from '@aws-amplify/backend';
  * with progress tracking, scheduling, and error handling.
  */
 export const BatchJob = a.model({
-  customer_id: a.string().required(),  // FK to Customer
+  customer_id: a.string(),  // FK to Customer - optional until migration complete (see MIGRATION_TODO.md)
   name: a.string().required(),
   status: a.enum(['pending', 'processing', 'completed', 'failed', 'paused']),
   garment_ids: a.string().array(),

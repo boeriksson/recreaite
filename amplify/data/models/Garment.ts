@@ -6,8 +6,8 @@ import { a } from '@aws-amplify/backend';
  * brand info, and AI-generated descriptions.
  */
 export const Garment = a.model({
-  customer_id: a.string().required(),  // FK to Customer
-  name: a.string().required(),
+  customer_id: a.string(),  // FK to Customer - optional until migration complete (see MIGRATION_TODO.md)
+  name: a.string(),  // Optional until migration complete (see MIGRATION_TODO.md)
   image_url: a.string(),
   category: a.enum(['tops', 'bottoms', 'dresses', 'outerwear', 'accessories']),
   brand: a.string(),

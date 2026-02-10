@@ -6,8 +6,8 @@ import { a } from '@aws-amplify/backend';
  * in fashion image generation (appearance, body type, etc.)
  */
 export const Model = a.model({
-  customer_id: a.string().required(),  // FK to Customer
-  name: a.string().required(),
+  customer_id: a.string(),  // FK to Customer - optional until migration complete (see MIGRATION_TODO.md)
+  name: a.string(),  // Optional until migration complete (see MIGRATION_TODO.md)
   portrait_url: a.string(),
   image_url: a.string(),
   gender: a.enum(['female', 'male', 'neutral']),

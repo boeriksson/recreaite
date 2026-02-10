@@ -6,7 +6,7 @@ import { a } from '@aws-amplify/backend';
  * including model, environment, and prompt configurations.
  */
 export const Template = a.model({
-  customer_id: a.string().required(),  // FK to Customer
+  customer_id: a.string(),  // FK to Customer - optional until migration complete (see MIGRATION_TODO.md)
   name: a.string().required(),
   description: a.string(),
   category: a.enum(['campaign', 'product_category', 'seasonal', 'brand_style', 'custom']),

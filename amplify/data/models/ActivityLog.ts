@@ -6,7 +6,7 @@ import { a } from '@aws-amplify/backend';
  * and debugging purposes.
  */
 export const ActivityLog = a.model({
-  customer_id: a.string().required(),  // FK to Customer
+  customer_id: a.string(),  // FK to Customer - optional until migration complete (see MIGRATION_TODO.md)
   action: a.string().required(),
   page_name: a.string(),
   metadata: a.json(),
