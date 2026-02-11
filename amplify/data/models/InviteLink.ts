@@ -10,6 +10,7 @@ export const InviteLink = a.model({
 
   code: a.string().required(),         // Unique invite code
   role: a.enum(['admin', 'member', 'viewer']), // Role for new users
+  email: a.string(),                   // Optional: restrict to specific email
 
   created_by: a.string(),              // UserProfile ID
   expires_at: a.datetime(),
@@ -20,4 +21,6 @@ export const InviteLink = a.model({
 }).authorization((allow) => [
   allow.owner(),
   allow.authenticated(),
+  // Allow public read for invite validation before signup
+  allow.guest().to(['read']),
 ]);

@@ -4,8 +4,9 @@ import { base44, setCustomerContext } from '@/api/amplifyClient';
 
 const CustomerContext = createContext();
 
-// Key for storing invite code in sessionStorage
+// Keys for storing invite code in sessionStorage
 const INVITE_CODE_KEY = 'pending_invite_code';
+const INVITE_FRESH_KEY = 'invite_fresh'; // Flag to trigger signup popup
 
 // Permission definitions by role
 const ROLE_PERMISSIONS = {
@@ -73,6 +74,7 @@ export const CustomerProvider = ({ children }) => {
     if (inviteCode) {
       console.log('Storing invite code:', inviteCode);
       sessionStorage.setItem(INVITE_CODE_KEY, inviteCode);
+      sessionStorage.setItem(INVITE_FRESH_KEY, 'true'); // Mark as fresh to trigger popup
       // Clean up URL (remove invite param)
       urlParams.delete('invite');
       const newUrl = urlParams.toString()
@@ -83,12 +85,12 @@ export const CustomerProvider = ({ children }) => {
   }, []);
 
   // Validate and consume an invite code
-  const consumeInviteCode = useCallback(async (code) => {
+  const consumeInviteCode = useCallback(async (code, userEmail) => {
     try {
       console.log('Looking up invite code:', code);
 
-      // Find invite by code
-      const invites = await base44.entities.InviteLink.filter({ code });
+      // Find invite by code - skip customer filter since user may not have a profile yet
+      const invites = await base44.entities.InviteLink.filter({ code }, { skipCustomerFilter: true });
       const invite = invites[0];
 
       if (!invite) {
@@ -109,6 +111,12 @@ export const CustomerProvider = ({ children }) => {
 
       if (invite.max_uses && invite.use_count >= invite.max_uses) {
         console.log('Invite has reached max uses');
+        return null;
+      }
+
+      // Check email restriction if set
+      if (invite.email && invite.email.toLowerCase() !== userEmail?.toLowerCase()) {
+        console.log('Email mismatch: invite restricted to', invite.email, 'but user email is', userEmail);
         return null;
       }
 
@@ -135,8 +143,6 @@ export const CustomerProvider = ({ children }) => {
     const newCustomer = await base44.entities.Customer.create({
       name: 'Default',
       slug: 'default',
-      plan: 'free',
-      plan_started_at: new Date().toISOString(),
       images_limit_monthly: 100,
       storage_limit_gb: 10,
       images_generated_this_month: 0,
@@ -205,7 +211,7 @@ export const CustomerProvider = ({ children }) => {
 
         if (pendingInviteCode) {
           console.log('Found pending invite code:', pendingInviteCode);
-          inviteData = await consumeInviteCode(pendingInviteCode);
+          inviteData = await consumeInviteCode(pendingInviteCode, user.email);
           // Clear the invite code from storage (whether valid or not)
           sessionStorage.removeItem(INVITE_CODE_KEY);
         }
@@ -231,8 +237,8 @@ export const CustomerProvider = ({ children }) => {
           // No valid invite - use default behavior
           console.log('No valid invite, checking for existing customers...');
 
-          // Check if any customer exists
-          const customers = await base44.entities.Customer.list();
+          // Check if any customer exists - skip filter since user has no profile yet
+          const customers = await base44.entities.Customer.list({ skipCustomerFilter: true });
 
           if (customers.length === 0) {
             // No customers exist - this is a fresh database

@@ -11,7 +11,8 @@ import {
   Database,
   Shield,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from 'lucide-react';
 import { useCustomer } from '@/lib/CustomerContext';
 import { createPageUrl } from '@/utils';
@@ -124,14 +125,18 @@ export default function Admin() {
               icon={Building2}
               title="Customers"
               description="Create and manage all customers"
-              badge="Super Admin"
             />
             <AdminCard
               to={createPageUrl('admin/data-migration')}
               icon={Database}
               title="Data Migration"
               description="Run multi-tenant data migration"
-              badge="Super Admin"
+            />
+            <AdminCard
+              to={createPageUrl('admin/settings')}
+              icon={Settings}
+              title="System Settings"
+              description="Configure exchange rates and system options"
             />
           </div>
         </div>

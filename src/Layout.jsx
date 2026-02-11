@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { base44 } from '@/api/amplifyClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useCustomer } from '@/lib/CustomerContext';
 import {
@@ -14,7 +13,6 @@ import {
   Sparkles,
   User,
   LogOut,
-  CreditCard,
   Database
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
@@ -26,17 +24,54 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import LoginModal from './components/auth/LoginModal';
-import PricingModal from './components/subscription/PricingModal';
+import InviteSignup from './components/auth/InviteSignup';
 import { GenerationStatusProvider } from './components/generation/GenerationStatusProvider';
 import FloatingGenerationBar from './components/generation/FloatingGenerationBar';
+import UsagePanel from './components/UsagePanel';
+
+// Key for storing invite code in sessionStorage
+const INVITE_CODE_KEY = 'pending_invite_code';
+const INVITE_FRESH_KEY = 'invite_fresh'; // Flag to indicate we just arrived with an invite
 
 export default function Layout({ children, currentPageName }) {
-  const { user, isAuthenticated, logout } = useAuth();
-  const { customer, refreshCustomerData, userProfile } = useCustomer();
+  const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
+  const { customer, userProfile } = useCustomer();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
+  const [showInviteSignup, setShowInviteSignup] = useState(false);
+
+  // Check for invite code and show invite signup if not authenticated
+  React.useEffect(() => {
+    // Wait for auth to finish loading
+    if (isLoadingAuth) return;
+
+    if (isAuthenticated) {
+      setShowInviteSignup(false);
+      // Clear the fresh flag when authenticated
+      sessionStorage.removeItem(INVITE_FRESH_KEY);
+      return;
+    }
+
+    // Check URL first - if invite in URL, mark as fresh
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteCodeInUrl = urlParams.get('invite');
+
+    if (inviteCodeInUrl) {
+      // Fresh invite from URL - store and mark as fresh
+      sessionStorage.setItem(INVITE_CODE_KEY, inviteCodeInUrl);
+      sessionStorage.setItem(INVITE_FRESH_KEY, 'true');
+      setShowInviteSignup(true);
+    } else {
+      // Check if we have a fresh invite in storage (CustomerContext may have captured it)
+      const isFresh = sessionStorage.getItem(INVITE_FRESH_KEY);
+      const inviteCodeInStorage = sessionStorage.getItem(INVITE_CODE_KEY);
+
+      if (isFresh && inviteCodeInStorage) {
+        setShowInviteSignup(true);
+      }
+    }
+  }, [isAuthenticated, isLoadingAuth]);
 
   const navItems = [
     { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -140,14 +175,9 @@ export default function Layout({ children, currentPageName }) {
                         {user.full_name || user.email}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
-                        {(customer?.plan || 'free').toUpperCase()} · {customer?.images_generated_this_month || 0}/{customer?.images_limit_monthly === -1 ? '∞' : (customer?.images_limit_monthly || 100)} bilder
+                        {customer?.name || 'No organization'}
                       </p>
                     </div>
-                    <DropdownMenuSeparator className={darkMode ? "bg-white/10" : "bg-black/10"} />
-                    <DropdownMenuItem onClick={() => setShowPricing(true)} className={darkMode ? "text-white" : "text-black"}>
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Uppgradera plan
-                    </DropdownMenuItem>
                     {(userProfile?.is_super_admin || userProfile?.role === 'owner' || userProfile?.role === 'admin') && (
                       <>
                         <DropdownMenuSeparator className={darkMode ? "bg-white/10" : "bg-black/10"} />
@@ -285,35 +315,34 @@ export default function Layout({ children, currentPageName }) {
       </footer>
 
       {/* Modals */}
-      {showLogin && (
-        <LoginModal 
-          onClose={() => setShowLogin(false)} 
-          darkMode={darkMode}
+      {showInviteSignup && (
+        <InviteSignup
+          onClose={() => {
+            setShowInviteSignup(false);
+            sessionStorage.removeItem(INVITE_CODE_KEY);
+            sessionStorage.removeItem(INVITE_FRESH_KEY);
+          }}
+          onSuccess={() => {
+            setShowInviteSignup(false);
+            // Don't remove INVITE_CODE_KEY here - let CustomerContext consume it after reload
+            sessionStorage.removeItem(INVITE_FRESH_KEY);
+            window.location.reload();
+          }}
         />
       )}
 
-      {showPricing && user && customer && (
-        <PricingModal
-          onClose={() => setShowPricing(false)}
-          onSelectPlan={async (planId) => {
-            const limits = { free: 100, starter: 500, pro: 2000, enterprise: -1 };
-            await base44.entities.Customer.update(customer.id, {
-              plan: planId,
-              images_limit_monthly: limits[planId],
-              images_generated_this_month: 0,
-              plan_started_at: new Date().toISOString(),
-              plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-            });
-            setShowPricing(false);
-            await refreshCustomerData();
-          }}
-          currentPlan={customer?.plan}
+      {showLogin && !showInviteSignup && (
+        <LoginModal
+          onClose={() => setShowLogin(false)}
           darkMode={darkMode}
         />
       )}
 
       {/* Floating Generation Status Bar */}
       <FloatingGenerationBar darkMode={darkMode} />
+
+      {/* Usage Panel */}
+      <UsagePanel darkMode={darkMode} />
       </div>
       </GenerationStatusProvider>
       );

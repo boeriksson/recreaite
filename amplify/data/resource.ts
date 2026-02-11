@@ -6,6 +6,7 @@ import { Customer } from './models/Customer';
 import { UserProfile } from './models/UserProfile';
 import { UsageCost } from './models/UsageCost';
 import { InviteLink } from './models/InviteLink';
+import { SystemSettings } from './models/SystemSettings';
 // Content entities
 import { GeneratedImage } from './models/GeneratedImage';
 import { Garment } from './models/Garment';
@@ -40,6 +41,8 @@ const schema = a.schema({
   UserProfile,
   UsageCost,
   InviteLink,
+  // System configuration
+  SystemSettings,
   // Content entities
   GeneratedImage,
   Garment,

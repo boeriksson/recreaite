@@ -11,11 +11,6 @@ export const Customer = a.model({
   domain: a.string(),                 // e.g., "acme.com"
   logo_url: a.string(),
 
-  // Subscription
-  plan: a.enum(['free', 'starter', 'pro', 'enterprise']),
-  plan_started_at: a.datetime(),
-  plan_expires_at: a.datetime(),
-
   // Limits
   images_limit_monthly: a.integer().default(100),
   storage_limit_gb: a.integer().default(10),
@@ -24,8 +19,13 @@ export const Customer = a.model({
   images_generated_this_month: a.integer().default(0),
   usage_reset_date: a.datetime(),
 
+  // Billing
+  surcharge_percent: a.float().default(0),  // Markup percentage on usage costs
+
   status: a.enum(['active', 'suspended', 'cancelled']),
 }).authorization((allow) => [
   allow.owner(),
   allow.authenticated(),
+  // Allow public read for invite signup flow (to show customer name)
+  allow.guest().to(['read']),
 ]);

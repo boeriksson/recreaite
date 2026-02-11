@@ -40,19 +40,32 @@ export default function AIStylist({
         style: g.style || 'unknown'
       }));
 
+      // Get names of pre-selected garments
+      const preSelectedNames = initialSelectedGarments.map(g => g.name);
+      const hasPreSelected = preSelectedNames.length > 0;
+
       // Build prompt with brand context
       let brandContext = '';
       if (brandSeed) {
         brandContext = `Varumärkesidentitet: ${brandSeed.name}. Stil: ${brandSeed.brand_style}. Karaktär: ${brandSeed.character}. Färgpalett: ${brandSeed.color_palette || 'varies'}. `;
       }
 
-      const prompt = `Du är en expert mode-stylist. ${brandContext}
+      // Build pre-selection instruction
+      let preSelectionInstruction = '';
+      if (hasPreSelected) {
+        preSelectionInstruction = `
+VIKTIGT: Användaren har redan valt dessa plagg: ${preSelectedNames.join(', ')}
+ALLA 3 outfit-förslag MÅSTE innehålla dessa valda plagg. Du kan lägga till fler plagg från listan för att komplettera outfiten.
+`;
+      }
 
+      const prompt = `Du är en expert mode-stylist. ${brandContext}
+${preSelectionInstruction}
 Här är tillgängliga plagg att styla:
 ${garmentDescriptions.map((g, i) => `${i + 1}. ${g.name} (${g.category}) - ${g.brand || 'No brand'}`).join('\n')}
 
 Skapa exakt 3 kompletta outfit-förslag som:
-1. Kombinerar minst 2-3 plagg från listan
+1. ${hasPreSelected ? 'MÅSTE innehålla de valda plaggen ovan, plus eventuellt fler från listan' : 'Kombinerar minst 2-3 plagg från listan'}
 2. Är estetiskt tilltalande och välbalanserade
 3. Följer grundläggande mode-regler (t.ex. färgkombinationer, stilenhet)
 4. Passar varumärkets identitet (om angiven)

@@ -21,6 +21,8 @@ import TeamMembers from './pages/admin/TeamMembers';
 import InviteLinks from './pages/admin/InviteLinks';
 import Customers from './pages/admin/Customers';
 import CostDashboard from './pages/admin/CostDashboard';
+import Settings from './pages/admin/Settings';
+import UsageHistory from './pages/admin/UsageHistory';
 import __Layout from './Layout.jsx';
 
 export const PAGES = {
@@ -42,6 +44,8 @@ export const PAGES = {
     "admin/invite-links": InviteLinks,
     "admin/customers": Customers,
     "admin/cost-dashboard": CostDashboard,
+    "admin/settings": Settings,
+    "admin/usage-history": UsageHistory,
 }
 
 export const pagesConfig = {

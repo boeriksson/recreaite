@@ -120,7 +120,7 @@ export default function Upload() {
     }
   }, [isAuthenticated, isLoadingAuth, navigateToLogin, navigate]);
 
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
 
   const [mode, setMode] = useState('enkel'); // 'enkel', 'batch', 'style' or 'expert'
   const [descriptionLanguage, setDescriptionLanguage] = useState('en');
@@ -365,33 +365,12 @@ export default function Upload() {
     setAnalyzing(true);
     setAiSuggestions(null);
     try {
-      // Check if image is webp format - convert to PNG if needed
-      let processedUrl = imageUrl;
-      if (imageUrl.toLowerCase().includes('.webp')) {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        
-        // Convert to PNG using canvas
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = imageUrl;
-        });
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        
-        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const pngFile = new File([pngBlob], 'garment.png', { type: 'image/png' });
-        
-        const { file_url } = await base44.integrations.Core.UploadFile({ file: pngFile });
-        processedUrl = file_url;
-      }
+      // Refresh signed URL in case it's expired
+      const freshUrl = await getSignedUrl(imageUrl);
+
+      // Use the URL directly - Lambda will fetch and handle format conversion
+      // (Avoids CORS issues with fetching S3 images from browser)
+      const processedUrl = freshUrl;
       
       const promptText = descriptionLanguage === 'sv'
         ? 'Analysera detta plagg noggrant och ge detaljerad information. Identifiera exakt plaggtyp (t.ex. hoodie, kavaj, chinos, sneakers), material, färg, mönster, passform, och stil. Ge även förslag på kompletterande plagg eller accessoarer som skulle passa bra tillsammans med detta. Svara på SVENSKA.'
@@ -646,15 +625,41 @@ export default function Upload() {
           existing_image_urls: imageUrls
         });
 
-        await createGeneratedImageMutation.mutateAsync({
-          garment_id: garment.id,
-          model_type: selectedModel?.id || 'default',
-          image_url: result.url,
-          prompt_used: prompt,
-          status: 'completed'
-        });
+        // Check if generation failed
+        if (result.status === 'failed') {
+          console.warn(`Generation blocked for ${garment.name}:`, result.errorMessage);
+          await createGeneratedImageMutation.mutateAsync({
+            garment_id: garment.id,
+            model_type: selectedModel?.id || 'default',
+            image_url: '',
+            prompt_used: prompt,
+            status: 'failed',
+            error_message: result.errorMessage || 'Bildgenerering misslyckades'
+          });
+        } else {
+          await createGeneratedImageMutation.mutateAsync({
+            garment_id: garment.id,
+            model_type: selectedModel?.id || 'default',
+            image_url: result.url,
+            prompt_used: prompt,
+            status: 'completed'
+          });
+        }
       } catch (error) {
         console.error(`Failed to generate for ${garment.name}:`, error);
+        // Create a failed record for unexpected errors too
+        try {
+          await createGeneratedImageMutation.mutateAsync({
+            garment_id: garment.id,
+            model_type: selectedModel?.id || 'default',
+            image_url: '',
+            prompt_used: prompt || '',
+            status: 'failed',
+            error_message: 'Ett oväntat fel uppstod'
+          });
+        } catch (e) {
+          console.error('Failed to create error record:', e);
+        }
       }
     }
 
@@ -1371,6 +1376,7 @@ export default function Upload() {
                   uploading={uploading}
                   preview={null}
                   onClear={() => {}}
+                  selectionLabel="Välj minst 2 plagg att styla med"
                 />
                 
                 {selectedGarments.length >= 2 && (
@@ -1416,65 +1422,6 @@ export default function Upload() {
                 </AccordionSection>
               )}
 
-              <AccordionSection id="manual-garments" title={`${selectedGarments.length >= 2 ? '3' : '2'}. ${t.selectGarmentsManually || 'Välj plagg manuellt'}`} isComplete={selectedGarments.length >= 2 && !aiStylistSelected} openSection={openSection} setOpenSection={setOpenSection}>
-                <div className="space-y-4">
-                  <p className="text-sm text-black/60 dark:text-white/60">{language === 'sv' ? 'Välj minst 2 plagg att kombinera' : 'Select at least 2 garments to combine'}</p>
-                  <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                    {allGarments.map((garment) => {
-                      const isSelected = selectedGarments.some(g => g.id === garment.id);
-                      return (
-                        <button
-                          key={garment.id}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedGarments(selectedGarments.filter(g => g.id !== garment.id));
-                            } else {
-                              setSelectedGarments([...selectedGarments, garment]);
-                            }
-                            setAiStylistSelected(false);
-                          }}
-                          className={cn(
-                            "aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all relative",
-                            isSelected ? "border-[#392599] ring-2 ring-[#392599]/20" : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
-                          )}
-                        >
-                          {garment.image_url ? (
-                            <SignedImage src={garment.image_url} alt={garment.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-[#f5f5f7] dark:bg-white/5 flex items-center justify-center">
-                              <Shirt className="h-6 w-6 text-black/20 dark:text-white/20" />
-                            </div>
-                          )}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-[#392599] flex items-center justify-center">
-                              <Check className="h-4 w-4 text-white" />
-                            </div>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                            <p className="text-xs text-white truncate">{garment.name}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {selectedGarments.length > 0 && (
-                    <div className="p-3 bg-[#392599]/10 rounded-lg">
-                      <p className="text-sm text-black dark:text-white">
-                        <span className="font-medium">{selectedGarments.length} plagg valda:</span>{' '}
-                        {selectedGarments.map(g => g.name).join(', ')}
-                      </p>
-                    </div>
-                  )}
-                  <Button
-                    onClick={() => setOpenSectionWithScroll('model')}
-                    disabled={selectedGarments.length < 2}
-                    variant="outline"
-                    className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
-                  >
-                    {language === 'sv' ? 'Fortsätt' : 'Continue'}
-                  </Button>
-                </div>
-              </AccordionSection>
             </>
           )}
 
@@ -1865,9 +1812,9 @@ export default function Upload() {
 
           {/* Model Selection (Enkel/Style mode - Batch mode has its own section above) */}
           {(mode === 'enkel' || (mode === 'style' && selectedGarments.length >= 2)) && (mode !== 'style' ? garmentData.name : true) && (
-            <AccordionSection 
-              id="model" 
-              title="4. Välj modell" 
+            <AccordionSection
+              id="model"
+              title={mode === 'style' ? "3. Välj modell" : "4. Välj modell"} 
               isComplete={selectedModel !== null || selectedGender !== null} 
               openSection={openSection} 
               setOpenSection={setOpenSection}

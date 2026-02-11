@@ -39,7 +39,8 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  CheckCircle
+  CheckCircle,
+  Mail
 } from 'lucide-react';
 import { useCustomer } from '@/lib/CustomerContext';
 import { base44 } from '@/api/amplifyClient';
@@ -55,18 +56,40 @@ function generateInviteCode() {
 }
 
 export default function InviteLinks() {
-  const { userProfile, customer, canInviteUsers } = useCustomer();
+  const { userProfile, customer, canInviteUsers, isSuperAdmin, isLoadingCustomer } = useCustomer();
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [sendingEmailId, setSendingEmailId] = useState(null);
+
+  // Super admin: all customers for dropdown
+  const [allCustomers, setAllCustomers] = useState([]);
 
   // Form state
   const [newLinkRole, setNewLinkRole] = useState('member');
   const [newLinkMaxUses, setNewLinkMaxUses] = useState('');
   const [newLinkExpiresDays, setNewLinkExpiresDays] = useState('7');
+  const [newLinkEmail, setNewLinkEmail] = useState('');
+  const [newLinkCustomerId, setNewLinkCustomerId] = useState('');
+
+  // Load all customers for super admin
+  const loadCustomers = async () => {
+    if (!isSuperAdmin()) return;
+    try {
+      const customers = await base44.entities.Customer.list();
+      setAllCustomers(customers);
+    } catch (err) {
+      console.error('Failed to load customers:', err);
+    }
+  };
+
+  // Re-run when userProfile loads (isSuperAdmin depends on it)
+  useEffect(() => {
+    loadCustomers();
+  }, [userProfile]);
 
   const loadLinks = async () => {
     if (!customer?.id) return;
@@ -75,9 +98,16 @@ export default function InviteLinks() {
     setError(null);
 
     try {
-      const inviteLinks = await base44.entities.InviteLink.filter({
-        customer_id: customer.id,
-      });
+      let inviteLinks;
+      if (isSuperAdmin()) {
+        // Super admin sees all invite links (skip customer filter)
+        inviteLinks = await base44.entities.InviteLink.list({ skipCustomerFilter: true });
+      } else {
+        // Regular admin sees only their customer's links
+        inviteLinks = await base44.entities.InviteLink.filter({
+          customer_id: customer.id,
+        });
+      }
       setLinks(inviteLinks.sort((a, b) =>
         new Date(b.createdAt) - new Date(a.createdAt)
       ));
@@ -94,16 +124,27 @@ export default function InviteLinks() {
   }, [customer?.id]);
 
   const handleCreateLink = async () => {
+    // Determine which customer to create the link for
+    const targetCustomerId = isSuperAdmin() ? newLinkCustomerId : customer?.id;
+
+    if (!targetCustomerId) {
+      alert('Please select a customer');
+      return;
+    }
+
     setCreating(true);
     try {
       const expiresAt = newLinkExpiresDays && newLinkExpiresDays !== 'never'
         ? new Date(Date.now() + parseInt(newLinkExpiresDays) * 24 * 60 * 60 * 1000).toISOString()
         : null;
 
+      const inviteCode = generateInviteCode();
+
       await base44.entities.InviteLink.create({
-        customer_id: customer.id,
-        code: generateInviteCode(),
+        customer_id: targetCustomerId,
+        code: inviteCode,
         role: newLinkRole,
+        email: newLinkEmail || null,
         created_by: userProfile.id,
         expires_at: expiresAt,
         max_uses: newLinkMaxUses ? parseInt(newLinkMaxUses) : null,
@@ -111,10 +152,35 @@ export default function InviteLinks() {
         status: 'active',
       });
 
+      // Send invite email if email was specified
+      if (newLinkEmail) {
+        try {
+          // Get customer name for the email
+          const targetCustomer = isSuperAdmin()
+            ? allCustomers.find(c => c.id === targetCustomerId)
+            : customer;
+
+          await base44.integrations.Core.SendInviteEmail({
+            to: newLinkEmail,
+            inviteCode: inviteCode,
+            customerName: targetCustomer?.name || 'your organization',
+            role: newLinkRole,
+            inviterName: userProfile?.display_name || userProfile?.email,
+          });
+          console.log('Invite email sent successfully');
+        } catch (emailErr) {
+          console.error('Failed to send invite email:', emailErr);
+          // Don't fail the whole operation if email fails
+          alert('Invite created but email could not be sent: ' + emailErr.message);
+        }
+      }
+
       setShowCreateDialog(false);
       setNewLinkRole('member');
       setNewLinkMaxUses('');
       setNewLinkExpiresDays('7');
+      setNewLinkEmail('');
+      setNewLinkCustomerId('');
       await loadLinks();
     } catch (err) {
       console.error('Failed to create invite link:', err);
@@ -124,15 +190,36 @@ export default function InviteLinks() {
     }
   };
 
-  const handleRevokeLink = async (linkId) => {
-    if (!confirm('Are you sure you want to revoke this invite link?')) return;
-
+  const handleDeleteLink = async (linkId) => {
     try {
-      await base44.entities.InviteLink.update(linkId, { status: 'revoked' });
+      await base44.entities.InviteLink.delete(linkId);
       await loadLinks();
     } catch (err) {
-      console.error('Failed to revoke link:', err);
-      alert('Failed to revoke link: ' + err.message);
+      console.error('Failed to delete link:', err);
+      alert('Failed to delete link: ' + err.message);
+    }
+  };
+
+  const handleResendEmail = async (link) => {
+    if (!link.email) return;
+
+    setSendingEmailId(link.id);
+    try {
+      const linkCustomer = allCustomers.find(c => c.id === link.customer_id) || customer;
+
+      await base44.integrations.Core.SendInviteEmail({
+        to: link.email,
+        inviteCode: link.code,
+        customerName: linkCustomer?.name || 'your organization',
+        role: link.role,
+        inviterName: userProfile?.display_name || userProfile?.email,
+      });
+      alert('Invite email sent successfully!');
+    } catch (err) {
+      console.error('Failed to send invite email:', err);
+      alert('Failed to send email: ' + err.message);
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -155,6 +242,15 @@ export default function InviteLinks() {
     }
     return <Badge className="bg-green-100 text-green-800">Active</Badge>;
   };
+
+  // Show loading while customer context is loading
+  if (isLoadingCustomer) {
+    return (
+      <div className="container max-w-4xl mx-auto py-8 px-4 flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!canInviteUsers()) {
     return (
@@ -209,6 +305,46 @@ export default function InviteLinks() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {/* Customer selector - only for super admins */}
+                {isSuperAdmin() ? (
+                  <div className="space-y-2">
+                    <Label>Customer</Label>
+                    <Select value={newLinkCustomerId} onValueChange={setNewLinkCustomerId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a customer..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allCustomers.map((cust) => (
+                          <SelectItem key={cust.id} value={cust.id}>
+                            {cust.name} ({cust.slug})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      New users will be added to this customer
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Customer</Label>
+                    <div className="text-sm py-2 px-3 bg-muted rounded-md">
+                      {customer?.name || 'Default'}
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label>Restrict to email (optional)</Label>
+                  <Input
+                    type="email"
+                    placeholder="anyone@example.com"
+                    value={newLinkEmail}
+                    onChange={(e) => setNewLinkEmail(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty to allow anyone to use this link
+                  </p>
+                </div>
                 <div className="space-y-2">
                   <Label>Role for new users</Label>
                   <Select value={newLinkRole} onValueChange={setNewLinkRole}>
@@ -250,7 +386,11 @@ export default function InviteLinks() {
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreateLink} disabled={creating}>
+                <Button
+                  type="button"
+                  onClick={handleCreateLink}
+                  disabled={creating}
+                >
                   {creating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -291,7 +431,9 @@ export default function InviteLinks() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {isSuperAdmin() && <TableHead>Customer</TableHead>}
                   <TableHead>Link</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Uses</TableHead>
@@ -300,12 +442,26 @@ export default function InviteLinks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {links.map((link) => (
+                {links.map((link) => {
+                  const linkCustomer = allCustomers.find(c => c.id === link.customer_id);
+                  return (
                   <TableRow key={link.id}>
+                    {isSuperAdmin() && (
+                      <TableCell className="text-sm">
+                        {linkCustomer?.name || link.customer_id?.slice(0, 8) + '...'}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <code className="text-xs bg-muted px-2 py-1 rounded break-all max-w-[300px] block">
                         {`${window.location.origin}/?invite=${link.code}`}
                       </code>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {link.email ? (
+                        <span className="text-muted-foreground">{link.email}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">Anyone</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{link.role}</Badge>
@@ -326,7 +482,7 @@ export default function InviteLinks() {
                           variant="ghost"
                           size="icon"
                           onClick={() => copyLink(link.code)}
-                          disabled={link.status === 'revoked'}
+                          title="Copy link"
                         >
                           {copiedId === link.code ? (
                             <CheckCircle className="h-4 w-4 text-green-500" />
@@ -334,19 +490,34 @@ export default function InviteLinks() {
                             <Copy className="h-4 w-4" />
                           )}
                         </Button>
-                        {link.status === 'active' && (
+                        {link.email && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleRevokeLink(link.id)}
+                            onClick={() => handleResendEmail(link)}
+                            disabled={sendingEmailId === link.id}
+                            title="Resend invite email"
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            {sendingEmailId === link.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4 text-blue-500" />
+                            )}
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteLink(link.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -50,8 +50,6 @@ export async function runMigration() {
       const { data: newCustomer, errors } = await client.models.Customer.create({
         name: 'Default',
         slug: 'default',
-        plan: 'free',
-        plan_started_at: new Date().toISOString(),
         images_limit_monthly: 100,
         storage_limit_gb: 10,
         images_generated_this_month: 0,

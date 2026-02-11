@@ -8,6 +8,7 @@ import { a } from '@aws-amplify/backend';
 export const GeneratedImage = a.model({
   customer_id: a.string(),  // FK to Customer - optional until migration complete (see MIGRATION_TODO.md)
   status: a.enum(['pending', 'processing', 'completed', 'failed']),
+  error_message: a.string(),            // User-friendly error message if failed
   image_url: a.string(),
   garment_id: a.string(),
   model_id: a.string(),

@@ -9,8 +9,9 @@ export const UsageCost = a.model({
   customer_id: a.string().required(),
   user_profile_id: a.string().required(),
 
-  action: a.enum(['image_generation', 'llm_invocation', 'custom_model_training', 'storage_upload', 'site_scan']),
-  cost_usd: a.float().required(),
+  action: a.enum(['image_generation', 'llm_invocation', 'custom_model_training', 'storage_upload', 'site_scan', 'dynamodb_write']),
+  cost_sek: a.float().required(),       // Cost in Swedish Kronor
+  exchange_rate: a.float(),              // USD to SEK rate used at time of tracking
   credits_used: a.integer().default(1),
 
   resource_type: a.string(),

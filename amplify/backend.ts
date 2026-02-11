@@ -3,6 +3,7 @@ import { auth } from './auth/resource';
 import { storage } from './storage/resource';
 import { data } from './data/resource';
 import { aiFunction } from './functions/ai/resource';
+import { sendEmailFunction } from './functions/send-email/resource';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 
 /**
@@ -13,18 +14,36 @@ const backend = defineBackend({
   storage,
   data,
   aiFunction,
+  sendEmailFunction,
 });
 
 // Get references to resources
 const authenticatedRole = backend.auth.resources.authenticatedUserIamRole;
 const unauthenticatedRole = backend.auth.resources.unauthenticatedUserIamRole;
 const lambdaFunctionInterface = backend.aiFunction.resources.lambda;
+const sendEmailLambda = backend.sendEmailFunction.resources.lambda;
 
 // Grant authenticated users permission to invoke the AI Lambda function
 authenticatedRole.addToPrincipalPolicy(
   new PolicyStatement({
     actions: ['lambda:InvokeFunction'],
     resources: [lambdaFunctionInterface.functionArn],
+  })
+);
+
+// Grant authenticated users permission to invoke the Send Email Lambda function
+authenticatedRole.addToPrincipalPolicy(
+  new PolicyStatement({
+    actions: ['lambda:InvokeFunction'],
+    resources: [sendEmailLambda.functionArn],
+  })
+);
+
+// Grant the Send Email Lambda permission to send emails via SES
+sendEmailLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'], // You can restrict this to specific verified identities
   })
 );
 
@@ -36,9 +55,10 @@ unauthenticatedRole.addToPrincipalPolicy(
   })
 );
 
-// Export the function name for client-side invocation
+// Export the function names for client-side invocation
 backend.addOutput({
   custom: {
     aiFunction: lambdaFunctionInterface.functionName,
+    sendEmailFunction: sendEmailLambda.functionName,
   },
 });

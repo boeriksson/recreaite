@@ -86,6 +86,8 @@ export const getSignedUrl = async (pathOrUrl) => {
 // Lazy-initialize the Amplify Data client (after Amplify.configure() is called)
 // Use userPool auth mode which matches our schema's defaultAuthorizationMode
 let _client = null;
+let _guestClient = null;
+
 const getClient = () => {
   if (!_client) {
     _client = generateClient({
@@ -93,6 +95,16 @@ const getClient = () => {
     });
   }
   return _client;
+};
+
+// Guest client for unauthenticated access (invite validation, etc.)
+const getGuestClient = () => {
+  if (!_guestClient) {
+    _guestClient = generateClient({
+      authMode: 'iam',
+    });
+  }
+  return _guestClient;
 };
 
 // Helper to invoke the AI Lambda function
@@ -159,6 +171,63 @@ const invokeAIFunction = async (action, args) => {
   }
 };
 
+// Helper to invoke the Send Email Lambda function
+const invokeSendEmailFunction = async (action, args) => {
+  try {
+    // Get credentials from Amplify Auth
+    const session = await fetchAuthSession();
+    const credentials = session.credentials;
+
+    if (!credentials) {
+      throw new Error('Not authenticated');
+    }
+
+    let functionName;
+    let region = 'eu-north-1';
+
+    try {
+      const outputs = await import('../../amplify_outputs.json');
+      functionName = outputs.default?.custom?.sendEmailFunction || outputs.custom?.sendEmailFunction;
+      const userPoolId = outputs.default?.auth?.user_pool_id || outputs.auth?.user_pool_id;
+      if (userPoolId) {
+        region = userPoolId.split('_')[0];
+      }
+    } catch (e) {
+      console.error('Failed to load amplify outputs:', e);
+    }
+
+    if (!functionName) {
+      throw new Error('Send email function not configured. Make sure the backend is deployed.');
+    }
+
+    const lambdaClient = new LambdaClient({
+      region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken,
+      },
+    });
+
+    const command = new InvokeCommand({
+      FunctionName: functionName,
+      Payload: JSON.stringify({ action, arguments: args }),
+    });
+
+    const response = await lambdaClient.send(command);
+    const payload = JSON.parse(new TextDecoder().decode(response.Payload));
+
+    if (response.FunctionError) {
+      throw new Error(payload.errorMessage || 'Lambda function error');
+    }
+
+    return payload;
+  } catch (error) {
+    console.error('Send Email Function error:', error);
+    throw error;
+  }
+};
+
 // Helper to check if error is an auth error
 const isAuthError = (error) => {
   const message = error?.message || error?.errors?.[0]?.message || String(error);
@@ -196,13 +265,15 @@ const createEntityAPI = (modelName) => {
   };
 
   return {
-    list: async () => {
+    list: async (options = {}) => {
       try {
-        const model = getModel();
+        // Use guest client if specified (for unauthenticated access like invite validation)
+        const client = options.useGuest ? getGuestClient() : getClient();
+        const model = client.models[modelName];
         if (!model) return [];
 
-        // Apply customer filter if applicable
-        const customerFilter = buildCustomerFilter();
+        // Apply customer filter if applicable (unless skipCustomerFilter is true)
+        const customerFilter = options.skipCustomerFilter ? {} : buildCustomerFilter();
         const hasFilter = Object.keys(customerFilter).length > 0;
 
         const { data, errors } = hasFilter
@@ -226,7 +297,7 @@ const createEntityAPI = (modelName) => {
       }
     },
 
-    filter: async (filters) => {
+    filter: async (filters, options = {}) => {
       try {
         const model = getModel();
         if (!model) return [];
@@ -243,8 +314,10 @@ const createEntityAPI = (modelName) => {
           filterConditions[key] = { eq: value };
         });
 
-        // Apply customer filter
-        const finalFilter = buildCustomerFilter(filterConditions);
+        // Apply customer filter (unless skipCustomerFilter is true)
+        const finalFilter = options.skipCustomerFilter
+          ? filterConditions
+          : buildCustomerFilter(filterConditions);
 
         // If no filters, just list all (still applies customer filter)
         if (Object.keys(finalFilter).length === 0) {
@@ -277,8 +350,10 @@ const createEntityAPI = (modelName) => {
       }
     },
 
-    get: async (id) => {
-      const model = getModel();
+    get: async (id, options = {}) => {
+      // Use guest client if specified (for unauthenticated access)
+      const client = options.useGuest ? getGuestClient() : getClient();
+      const model = client.models[modelName];
       if (!model) throw new Error(`${modelName} not found: ${id}`);
       const { data, errors } = await model.get({ id });
       if (errors) throw new Error(errors[0]?.message || 'Get failed');
@@ -318,6 +393,46 @@ const createEntityAPI = (modelName) => {
 
       const { data, errors } = await model.create(sanitizedInput);
       if (errors) throw new Error(errors[0]?.message || 'Create failed');
+
+      // Track DynamoDB write cost (skip for UsageCost to avoid recursion)
+      if (modelName !== 'UsageCost' && modelName !== 'SystemSettings' && _currentCustomerId && _currentUserProfileId) {
+        try {
+          // Estimate record size in bytes
+          const recordSize = JSON.stringify(sanitizedInput).length;
+          const writeUnits = Math.ceil(recordSize / 1024); // 1 WRU = 1KB
+
+          const settings = await getSystemSettings();
+          const USD_TO_SEK = settings.usd_to_sek_rate || 10.50;
+          const DYNAMODB_PRICE = settings.dynamodb_price_per_write || 0.00000125;
+
+          const costUsd = writeUnits * DYNAMODB_PRICE;
+          const costSek = costUsd * USD_TO_SEK;
+
+          // Only track if cost is meaningful
+          if (costSek > 0) {
+            const client = getClient();
+            await client.models.UsageCost.create({
+              customer_id: _currentCustomerId,
+              user_profile_id: _currentUserProfileId,
+              action: 'dynamodb_write',
+              cost_sek: costSek,
+              exchange_rate: USD_TO_SEK,
+              credits_used: 1,
+              resource_type: modelName,
+              resource_id: data.id,
+              metadata: JSON.stringify({
+                recordSizeBytes: recordSize,
+                writeUnits: writeUnits,
+                pricePerWrite: DYNAMODB_PRICE,
+                costUsd: costUsd,
+              }),
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to track DynamoDB cost:', err);
+        }
+      }
+
       return data;
     },
 
@@ -489,10 +604,98 @@ const integrations = {
 
         // Get the URL for the uploaded file
         const { url } = await getUrl({ path: result.path });
+
+        // Track storage cost based on file size
+        if (_currentCustomerId && _currentUserProfileId && file.size > 0) {
+          try {
+            const settings = await getSystemSettings();
+            const USD_TO_SEK = settings.usd_to_sek_rate || 10.50;
+            const S3_PRICE_PER_GB = settings.s3_price_per_gb || 0.023;
+
+            const fileSizeGB = file.size / (1024 * 1024 * 1024);
+            const storageCostUsdPerMonth = fileSizeGB * S3_PRICE_PER_GB;
+            const storageCostSek = storageCostUsdPerMonth * USD_TO_SEK;
+
+            console.log(`Storage cost: ${(file.size / 1024).toFixed(1)} KB = ${storageCostSek.toFixed(6)} kr/month`);
+
+            const client = getClient();
+            await client.models.UsageCost.create({
+              customer_id: _currentCustomerId,
+              user_profile_id: _currentUserProfileId,
+              action: 'storage_upload',
+              cost_sek: storageCostSek,
+              exchange_rate: USD_TO_SEK,
+              credits_used: 1,
+              resource_type: 'StorageFile',
+              resource_id: result.path,
+              metadata: JSON.stringify({
+                filename: file.name,
+                fileSize: file.size,
+                fileSizeKB: (file.size / 1024).toFixed(2),
+                contentType: file.type,
+                costUsdPerMonth: storageCostUsdPerMonth,
+                s3PricePerGb: S3_PRICE_PER_GB,
+                s3Path: result.path,
+              }),
+            });
+          } catch (err) {
+            console.warn('Failed to track storage cost:', err);
+          }
+        }
+
         return { file_url: url.toString() };
       } catch (error) {
         console.error('Upload error:', error);
         throw error;
+      }
+    },
+
+    // Helper to track AI usage costs (in SEK)
+    _trackUsageCost: async (action, usage, resourceType, resourceId) => {
+      if (!usage || !_currentCustomerId || !_currentUserProfileId) {
+        console.log('Skipping cost tracking - missing context');
+        return;
+      }
+
+      // Gemini pricing (approximate USD per 1M tokens)
+      const PRICING = {
+        'gemini-image': { input: 1.25, output: 5.00 },      // Pro/Image model
+        'gemini-2.0-flash': { input: 0.10, output: 0.40 },  // Flash model
+      };
+
+      // Get exchange rate from system settings
+      const settings = await getSystemSettings();
+      const USD_TO_SEK = settings.usd_to_sek_rate || 10.50;
+
+      const pricing = PRICING[usage.model] || PRICING['gemini-2.0-flash'];
+      const inputCostUsd = (usage.promptTokens / 1_000_000) * pricing.input;
+      const outputCostUsd = (usage.outputTokens / 1_000_000) * pricing.output;
+      const totalCostUsd = inputCostUsd + outputCostUsd;
+      const totalCostSek = totalCostUsd * USD_TO_SEK;
+
+      console.log(`Usage cost: ${usage.promptTokens} input + ${usage.outputTokens} output = $${totalCostUsd.toFixed(6)} = ${totalCostSek.toFixed(4)} kr`);
+
+      try {
+        const client = getClient();
+        await client.models.UsageCost.create({
+          customer_id: _currentCustomerId,
+          user_profile_id: _currentUserProfileId,
+          action: action,
+          cost_sek: totalCostSek,
+          exchange_rate: USD_TO_SEK,
+          credits_used: 1,
+          resource_type: resourceType,
+          resource_id: resourceId,
+          metadata: JSON.stringify({
+            model: usage.model,
+            promptTokens: usage.promptTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
+            costUsd: totalCostUsd,
+          }),
+        });
+      } catch (err) {
+        console.warn('Failed to track usage cost:', err);
       }
     },
 
@@ -514,6 +717,27 @@ const integrations = {
         });
         console.log('GenerateImage: Lambda returned, url length:', result?.url?.length || 0);
 
+        // Check if generation failed (Lambda now returns error info instead of throwing)
+        if (result?.status === 'failed') {
+          console.log('GenerateImage: Generation failed -', result.errorCode, result.errorMessage);
+          return {
+            url: '',
+            status: 'failed',
+            errorCode: result.errorCode || 'UNKNOWN_ERROR',
+            errorMessage: result.errorMessage || 'Bildgenerering misslyckades',
+          };
+        }
+
+        // Track usage cost if available
+        if (result?.usage) {
+          await integrations.Core._trackUsageCost(
+            'image_generation',
+            result.usage,
+            'GeneratedImage',
+            params.resourceId || null
+          );
+        }
+
         // If we got a data URL, upload it to S3 first
         if (result && result.url && result.url.startsWith('data:')) {
           console.log('GenerateImage: Converting data URL to blob...');
@@ -534,7 +758,7 @@ const integrations = {
           // Get the URL for the uploaded file
           const { url } = await getUrl({ path: uploadResult.path });
           console.log('GenerateImage: Got S3 URL:', url.toString().substring(0, 100));
-          return { url: url.toString(), status: 'completed' };
+          return { url: url.toString(), status: 'completed', usage: result.usage };
         }
 
         console.log('GenerateImage: No data URL, returning result as-is');
@@ -558,9 +782,37 @@ const integrations = {
           file_urls: fileUrls,
           response_json_schema: params.response_json_schema || null,
         });
+
+        // Track usage cost if available
+        if (result?.usage) {
+          await integrations.Core._trackUsageCost(
+            'llm_invocation',
+            result.usage,
+            params.resourceType || null,
+            params.resourceId || null
+          );
+        }
+
         return result || { response: '' };
       } catch (error) {
         console.error('InvokeLLM error:', error);
+        throw error;
+      }
+    },
+
+    // Send invite email via Lambda + SES
+    SendInviteEmail: async (params) => {
+      try {
+        const result = await invokeSendEmailFunction('sendInviteEmail', {
+          to: params.to,
+          inviteCode: params.inviteCode,
+          customerName: params.customerName,
+          role: params.role || 'member',
+          inviterName: params.inviterName,
+        });
+        return result;
+      } catch (error) {
+        console.error('SendInviteEmail error:', error);
         throw error;
       }
     },
@@ -592,6 +844,42 @@ const appLogs = {
   },
 };
 
+// Cache for system settings
+let _cachedSettings = null;
+let _settingsCacheTime = 0;
+const SETTINGS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Get system settings (with caching)
+const getSystemSettings = async () => {
+  const now = Date.now();
+  if (_cachedSettings && (now - _settingsCacheTime) < SETTINGS_CACHE_DURATION) {
+    return _cachedSettings;
+  }
+
+  try {
+    const client = getClient();
+    const { data } = await client.models.SystemSettings.list({
+      filter: { key: { eq: 'global' } }
+    });
+    if (data && data.length > 0) {
+      _cachedSettings = data[0];
+      _settingsCacheTime = now;
+      return _cachedSettings;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch system settings:', err);
+  }
+
+  // Return defaults if no settings found
+  return { usd_to_sek_rate: 10.50 };
+};
+
+// Clear settings cache (call after updating settings)
+export const clearSettingsCache = () => {
+  _cachedSettings = null;
+  _settingsCacheTime = 0;
+};
+
 // Main export - matches base44 API shape
 export const base44 = {
   auth: authMethods,
@@ -601,6 +889,8 @@ export const base44 = {
     UserProfile: createEntityAPI('UserProfile'),
     UsageCost: createEntityAPI('UsageCost'),
     InviteLink: createEntityAPI('InviteLink'),
+    // System configuration
+    SystemSettings: createEntityAPI('SystemSettings'),
     // Content entities
     GeneratedImage: createEntityAPI('GeneratedImage'),
     Garment: createEntityAPI('Garment'),

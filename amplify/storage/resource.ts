@@ -10,5 +10,5 @@ export const storage = defineStorage({
     'uploads/{entity_id}/*': [
       allow.entity('identity').to(['read', 'write', 'delete']),
     ],
-  })
+  }),
 });

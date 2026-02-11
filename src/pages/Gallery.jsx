@@ -793,23 +793,25 @@ export default function Gallery() {
 
           {/* Failed Images */}
           {failedImages.map((image) => {
+            // Use error_message field if available, fall back to extracting from prompt
             const errorMatch = image.prompt_used?.match(/^ERROR: (.+?)(\n|$)/);
-            const errorMsg = errorMatch ? errorMatch[1] : null;
+            const errorMsg = image.error_message || (errorMatch ? errorMatch[1] : null);
+            const defaultError = language === 'sv' ? 'Generering kunde inte slutföras' : 'Generation could not complete';
             return (
               <motion.div
                 key={image.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="aspect-[3/4] rounded-2xl overflow-hidden bg-gradient-to-br from-red-500/20 to-red-500/10 border-2 border-red-500/30 flex items-center justify-center relative group"
-                title={errorMsg || 'Unknown error'}
+                title={errorMsg || defaultError}
               >
                 <div className="relative z-10 text-center p-4">
                   <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
                     <X className="h-6 w-6 text-red-500" />
                   </div>
                   <p className="text-sm font-medium text-red-500">{language === 'sv' ? 'Misslyckades' : 'Failed'}</p>
-                  <p className="text-xs text-red-500/60 mt-1 line-clamp-2 max-w-[150px] mx-auto">
-                    {errorMsg || (language === 'sv' ? 'Generering kunde inte slutföras' : 'Generation could not complete')}
+                  <p className="text-xs text-red-500/60 mt-1 line-clamp-3 max-w-[180px] mx-auto">
+                    {errorMsg || defaultError}
                   </p>
                 </div>
                 {/* Delete button */}

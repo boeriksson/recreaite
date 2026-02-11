@@ -20,22 +20,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import {
   Users,
   ArrowLeft,
   MoreHorizontal,
@@ -46,7 +30,6 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  ArrowRightLeft
 } from 'lucide-react';
 import { useCustomer } from '@/lib/CustomerContext';
 import { base44 } from '@/api/amplifyClient';
@@ -60,32 +43,10 @@ const ROLE_LABELS = {
 };
 
 export default function TeamMembers() {
-  const { userProfile, customer, canManageUsers, isSuperAdmin } = useCustomer();
+  const { userProfile, customer, canManageUsers } = useCustomer();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Move user dialog state
-  const [showMoveDialog, setShowMoveDialog] = useState(false);
-  const [memberToMove, setMemberToMove] = useState(null);
-  const [allCustomers, setAllCustomers] = useState([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [moving, setMoving] = useState(false);
-
-  // Load all customers for super admin
-  const loadCustomers = async () => {
-    if (!isSuperAdmin()) return;
-    try {
-      const customers = await base44.entities.Customer.list();
-      setAllCustomers(customers);
-    } catch (err) {
-      console.error('Failed to load customers:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
 
   const loadMembers = async () => {
     if (!customer?.id) return;
@@ -143,32 +104,6 @@ export default function TeamMembers() {
     } catch (err) {
       console.error('Failed to reactivate user:', err);
       alert('Failed to reactivate user: ' + err.message);
-    }
-  };
-
-  const openMoveDialog = (member) => {
-    setMemberToMove(member);
-    setSelectedCustomerId('');
-    setShowMoveDialog(true);
-  };
-
-  const handleMoveUser = async () => {
-    if (!memberToMove || !selectedCustomerId) return;
-
-    setMoving(true);
-    try {
-      await base44.entities.UserProfile.update(memberToMove.id, {
-        customer_id: selectedCustomerId,
-        role: 'member', // Reset to member when moving
-      });
-      setShowMoveDialog(false);
-      setMemberToMove(null);
-      await loadMembers();
-    } catch (err) {
-      console.error('Failed to move user:', err);
-      alert('Failed to move user: ' + err.message);
-    } finally {
-      setMoving(false);
     }
   };
 
@@ -310,13 +245,6 @@ export default function TeamMembers() {
                                 Make Viewer
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              {isSuperAdmin() && (
-                                <DropdownMenuItem onClick={() => openMoveDialog(member)}>
-                                  <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                  Move to Customer
-                                </DropdownMenuItem>
-                              )}
-                              {isSuperAdmin() && <DropdownMenuSeparator />}
                               {member.status === 'suspended' ? (
                                 <DropdownMenuItem onClick={() => handleReactivate(member.id)}>
                                   Reactivate
@@ -341,52 +269,6 @@ export default function TeamMembers() {
           )}
         </CardContent>
       </Card>
-
-      {/* Move User Dialog */}
-      <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Move User to Another Customer</DialogTitle>
-            <DialogDescription>
-              Move {memberToMove?.display_name || memberToMove?.email} to a different customer.
-              They will become a member of the new organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label className="text-sm font-medium">Select Customer</Label>
-            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-              <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Choose a customer..." />
-              </SelectTrigger>
-              <SelectContent>
-                {allCustomers
-                  .filter(c => c.id !== customer?.id)
-                  .map(cust => (
-                    <SelectItem key={cust.id} value={cust.id}>
-                      {cust.name} ({cust.slug})
-                    </SelectItem>
-                  ))
-                }
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMoveDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleMoveUser} disabled={!selectedCustomerId || moving}>
-              {moving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Moving...
-                </>
-              ) : (
-                'Move User'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

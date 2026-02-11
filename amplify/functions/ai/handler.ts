@@ -88,9 +88,17 @@ export const handler = async (event: LambdaEvent): Promise<unknown> => {
       if (request.existing_image_urls && request.existing_image_urls.length > 0) {
         const parts: any[] = [{ text: request.prompt }];
 
-        for (const url of request.existing_image_urls) {
+        for (let i = 0; i < request.existing_image_urls.length; i++) {
+          const url = request.existing_image_urls[i];
           if (!url) continue;
           try {
+            // Add a label before each image to help the model understand the purpose
+            if (i === 0) {
+              parts.push({ text: '\n\n[REFERENCE IMAGE 1 - MODEL FACE: The person in this image is the EXACT model to use. Copy this face EXACTLY - same eyes, nose, mouth, skin tone, hair color, hair style. This is the PRIMARY identity reference.]' });
+            } else {
+              parts.push({ text: `\n\n[REFERENCE IMAGE ${i + 1} - GARMENT: This is a clothing item to put on the model. Reproduce this garment exactly as shown.]` });
+            }
+
             const imageData = await fetchImageAsBase64(url);
             parts.push({
               inlineData: {
@@ -190,13 +198,59 @@ export const handler = async (event: LambdaEvent): Promise<unknown> => {
       }
 
       if (!imageUrl) {
-        // If no image was generated, return the text response for debugging
-        const errorMsg = textResponse || response.text || 'No image generated - check model capabilities';
-        console.error('No image in response. Text response:', errorMsg);
-        throw new Error(`Image generation failed: ${errorMsg}`);
+        // Determine the failure reason
+        let errorCode = 'GENERATION_FAILED';
+        let errorMessage = 'Bildgenerering misslyckades';
+
+        // Check for content moderation / safety issues
+        const candidate = response.candidates?.[0];
+        const finishReason = candidate?.finishReason;
+        const promptFeedback = (response as any).promptFeedback;
+
+        console.log('Analyzing failure - finishReason:', finishReason, 'promptFeedback:', JSON.stringify(promptFeedback));
+
+        if (finishReason === 'SAFETY' || finishReason === 'BLOCKED') {
+          errorCode = 'CONTENT_BLOCKED';
+          errorMessage = 'Innehållet blockerades av säkerhetsskäl (t.ex. kända personer, varumärken)';
+        } else if (promptFeedback?.blockReason) {
+          errorCode = 'PROMPT_BLOCKED';
+          errorMessage = `Prompten blockerades: ${promptFeedback.blockReason}`;
+        } else if (textResponse.toLowerCase().includes('sorry') ||
+                   textResponse.toLowerCase().includes('cannot') ||
+                   textResponse.toLowerCase().includes("can't")) {
+          errorCode = 'CONTENT_REFUSED';
+          errorMessage = 'AI-modellen vägrade generera bilden (innehållet kan bryta mot riktlinjer)';
+        } else if (!response.candidates || response.candidates.length === 0) {
+          errorCode = 'NO_RESPONSE';
+          errorMessage = 'Ingen respons från AI-modellen';
+        }
+
+        console.error(`Image generation failed [${errorCode}]:`, textResponse || 'No text response');
+
+        // Return structured error instead of throwing
+        return {
+          url: '',
+          status: 'failed',
+          errorCode,
+          errorMessage,
+          debugInfo: textResponse || 'No additional info',
+        };
       }
 
-      return { url: imageUrl, status: 'completed' };
+      // Extract usage metadata for cost tracking
+      const usageMetadata = (response as any).usageMetadata || {};
+      console.log('Usage metadata:', JSON.stringify(usageMetadata));
+
+      return {
+        url: imageUrl,
+        status: 'completed',
+        usage: {
+          promptTokens: usageMetadata.promptTokenCount || 0,
+          outputTokens: usageMetadata.candidatesTokenCount || 0,
+          totalTokens: usageMetadata.totalTokenCount || 0,
+          model: 'gemini-image',
+        },
+      };
 
     } else if (action === 'invokeLLM') {
       const request = args as InvokeLLMArgs;
@@ -251,6 +305,17 @@ export const handler = async (event: LambdaEvent): Promise<unknown> => {
 
       const text = response.text || '';
 
+      // Extract usage metadata for cost tracking
+      const usageMetadata = (response as any).usageMetadata || {};
+      console.log('Usage metadata:', JSON.stringify(usageMetadata));
+
+      const usage = {
+        promptTokens: usageMetadata.promptTokenCount || 0,
+        outputTokens: usageMetadata.candidatesTokenCount || 0,
+        totalTokens: usageMetadata.totalTokenCount || 0,
+        model: 'gemini-2.0-flash',
+      };
+
       // Try to parse as JSON if schema was provided
       if (jsonSchema) {
         try {
@@ -260,14 +325,15 @@ export const handler = async (event: LambdaEvent): Promise<unknown> => {
           if (jsonMatch) {
             jsonStr = jsonMatch[1].trim();
           }
-          return JSON.parse(jsonStr);
+          const parsed = JSON.parse(jsonStr);
+          return { ...parsed, usage };
         } catch {
           // Return raw text if JSON parsing fails
-          return { response: text };
+          return { response: text, usage };
         }
       }
 
-      return { response: text };
+      return { response: text, usage };
 
     } else {
       throw new Error(`Unknown action: ${action}`);

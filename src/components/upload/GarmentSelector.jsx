@@ -18,6 +18,7 @@ import { SignedImage } from "@/components/ui/SignedImage";
  * @param {string} props.preview - Preview URL for uploaded file
  * @param {Function} props.onClear - Clear uploaded file
  * @param {number} props.maxGarments - Maximum number of garments to show in grid (default: 12)
+ * @param {string} props.selectionLabel - Custom label for the garment selection section
  */
 export default function GarmentSelector({
   onFileSelect,
@@ -30,6 +31,7 @@ export default function GarmentSelector({
   preview = null,
   onClear,
   maxGarments = 12,
+  selectionLabel,
 }) {
   // Normalize selectedGarments to always be an array for easier handling
   const selectedIds = allowMultiple 
@@ -72,9 +74,9 @@ export default function GarmentSelector({
       {showExistingGarments && (
         <div className="pt-6 border-t border-black/10 dark:border-white/10">
           <h4 className="text-sm font-medium text-black dark:text-white mb-3">
-            {allowMultiple 
+            {selectionLabel || (allowMultiple
               ? 'Eller välj från dina plagg (flera val möjliga)'
-              : 'Eller välj från dina plagg'}
+              : 'Eller välj från dina plagg')}
           </h4>
           <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
             {allGarments.slice(0, maxGarments).map((garment) => {

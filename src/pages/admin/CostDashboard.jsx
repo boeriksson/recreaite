@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   BarChart3,
@@ -116,18 +115,11 @@ export default function CostDashboard() {
         </Alert>
       )}
 
-      {/* Current Plan */}
+      {/* Usage Limits */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Current Plan</CardTitle>
-              <CardDescription>Your subscription and usage limits</CardDescription>
-            </div>
-            <Badge className="text-lg px-3 py-1">
-              {(customer?.plan || 'free').toUpperCase()}
-            </Badge>
-          </div>
+          <CardTitle>Usage</CardTitle>
+          <CardDescription>Your current usage and limits</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
