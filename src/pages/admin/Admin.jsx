@@ -605,7 +605,7 @@ export default function Admin() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Access denied. You need admin privileges to access this area.
+            Åtkomst nekad. Du behöver administratörsbehörighet för att komma åt detta område.
           </AlertDescription>
         </Alert>
       </div>
@@ -667,21 +667,21 @@ export default function Admin() {
       {/* Team Management - Owner/Admin */}
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Team Management
+          Teamhantering
         </h2>
         <div className="grid gap-3">
           <AdminCard
             to={createPageUrl('admin/team-members')}
             icon={Users}
-            title="Team Members"
-            description="View and manage users in your organization"
+            title="Teammedlemmar"
+            description="Visa och hantera användare i din organisation"
             onNavigate={handleNavigate}
           />
           <AdminCard
             to={createPageUrl('admin/invite-links')}
             icon={LinkIcon}
-            title="Invite Links"
-            description="Create signup links to invite new users"
+            title="Inbjudningslänkar"
+            description="Skapa registreringslänkar för att bjuda in nya användare"
             onNavigate={handleNavigate}
           />
         </div>
@@ -824,14 +824,14 @@ export default function Admin() {
       {isOwner() && (
         <div className="space-y-3">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            Billing & Usage
+            Fakturering & användning
           </h2>
           <div className="grid gap-3">
             <AdminCard
               to={createPageUrl('admin/cost-dashboard')}
               icon={BarChart3}
-              title="Cost Dashboard"
-              description="View usage statistics and costs"
+              title="Kostnadspanel"
+              description="Visa användningsstatistik och kostnader"
               onNavigate={handleNavigate}
             />
           </div>
@@ -842,28 +842,28 @@ export default function Admin() {
       {isSuperAdmin() && (
         <div className="space-y-3">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            Super Admin
+            Superadmin
           </h2>
           <div className="grid gap-3">
             <AdminCard
               to={createPageUrl('admin/customers')}
               icon={Building2}
-              title="Customers"
-              description="Create and manage all customers"
+              title="Kunder"
+              description="Skapa och hantera alla kunder"
               onNavigate={handleNavigate}
             />
             <AdminCard
               to={createPageUrl('admin/data-migration')}
               icon={Database}
-              title="Data Migration"
-              description="Run multi-tenant data migration"
+              title="Datamigrering"
+              description="Kör datamigrering för multi-tenant"
               onNavigate={handleNavigate}
             />
             <AdminCard
               to={createPageUrl('admin/settings')}
               icon={Settings}
-              title="System Settings"
-              description="Configure exchange rates and system options"
+              title="Systeminställningar"
+              description="Konfigurera växelkurser och systemalternativ"
               onNavigate={handleNavigate}
             />
           </div>

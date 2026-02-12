@@ -27,7 +27,6 @@ import LoginModal from './components/auth/LoginModal';
 import InviteSignup from './components/auth/InviteSignup';
 import { GenerationStatusProvider } from './components/generation/GenerationStatusProvider';
 import FloatingGenerationBar from './components/generation/FloatingGenerationBar';
-import UsagePanel from './components/UsagePanel';
 
 // Key for storing invite code in sessionStorage
 const INVITE_CODE_KEY = 'pending_invite_code';
@@ -340,9 +339,6 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Floating Generation Status Bar */}
       <FloatingGenerationBar darkMode={darkMode} />
-
-      {/* Usage Panel */}
-      <UsagePanel darkMode={darkMode} />
       </div>
       </GenerationStatusProvider>
       );
