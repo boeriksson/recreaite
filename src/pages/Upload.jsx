@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { base44, getSignedUrl } from '@/api/amplifyClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useCustomer } from '@/lib/CustomerContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -61,6 +62,7 @@ import AIStylist from '../components/styling/AIStylist';
 import BatchJobCreator from '../components/batch/BatchJobCreator';
 import BatchJobsList from '../components/batch/BatchJobsList';
 import { useLanguage } from '../components/LanguageContext';
+import { TreeSelector } from '@/components/ui/TreeSelector';
 
 const STUDIO_PROMPT = 'Professional studio photography with consistent soft diffused lighting from key light at 45 degrees, fill light opposite side, and subtle rim light. CRITICAL: Clean seamless light grey studio backdrop (RGB 211, 211, 211) with NO windows, NO walls, NO architectural elements, NO environmental details - just plain seamless backdrop. Color temperature 5500K, high-key lighting setup maintaining exact same brightness and shadow falloff across all images. Model positioned center frame with even illumination. NEGATIVE PROMPT: No windows, no wall details, no interior elements, no background variations.';
 
@@ -111,6 +113,7 @@ export default function Upload() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
+  const { customer } = useCustomer();
 
   // Redirect to login if not authenticated
   React.useEffect(() => {
@@ -137,6 +140,7 @@ export default function Upload() {
     brand: '',
     sku: ''
   });
+  const [customFieldValues, setCustomFieldValues] = useState({});
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedGender, setSelectedGender] = useState(null);
@@ -195,6 +199,19 @@ export default function Upload() {
   const [showInfo, setShowInfo] = useState(false);
   const [savedAnalysis, setSavedAnalysis] = useState(null);
   const [showBatchJobCreator, setShowBatchJobCreator] = useState(false);
+
+  // Parse customer's custom fields
+  const customFields = React.useMemo(() => {
+    if (!customer?.custom_fields) return [];
+    try {
+      const fields = typeof customer.custom_fields === 'string'
+        ? JSON.parse(customer.custom_fields)
+        : customer.custom_fields;
+      return Array.isArray(fields) ? fields : [];
+    } catch {
+      return [];
+    }
+  }, [customer?.custom_fields]);
 
   // Set default open section based on mode (without scrolling on initial tab selection)
   React.useEffect(() => {
@@ -278,6 +295,15 @@ export default function Upload() {
               brand: garment.brand || '',
               sku: garment.sku || ''
             });
+            // Load custom field values if they exist
+            if (garment.custom_field_values) {
+              const values = typeof garment.custom_field_values === 'string'
+                ? JSON.parse(garment.custom_field_values)
+                : garment.custom_field_values;
+              setCustomFieldValues(values || {});
+            } else {
+              setCustomFieldValues({});
+            }
             setUploadedUrl(garment.image_url);
             setPreview(garment.image_url);
             
@@ -466,6 +492,129 @@ export default function Upload() {
         // Auto-select gender based on AI suggestion
         if (analysis.suggested_gender && !selectedModel) {
           setSelectedGender(analysis.suggested_gender);
+        }
+
+        // Auto-populate custom fields (text fields with prompts and tree fields)
+        const textFieldsWithPrompts = customFields.filter(f => f.type === 'text' && f.prompt);
+        const treeFields = customFields.filter(f => f.type === 'tree' && f.treeData?.length > 0);
+
+        if (textFieldsWithPrompts.length > 0 || treeFields.length > 0) {
+          const newCustomValues = { ...customFieldValues };
+
+          // Process text fields with prompts
+          for (const field of textFieldsWithPrompts) {
+            try {
+              const fieldAnalysis = await base44.integrations.Core.InvokeLLM({
+                prompt: `${field.prompt}\n\nRespond with ONLY the requested information, no explanations or additional text. Keep it concise.`,
+                file_urls: [processedUrl],
+                response_json_schema: {
+                  type: 'object',
+                  properties: {
+                    value: { type: 'string', description: 'The extracted information based on the prompt' }
+                  },
+                  required: ['value']
+                }
+              });
+
+              if (fieldAnalysis?.value) {
+                newCustomValues[field.id] = fieldAnalysis.value;
+              }
+            } catch (fieldError) {
+              console.warn(`Could not auto-populate field ${field.label}:`, fieldError);
+            }
+          }
+
+          // Process tree fields - ask AI to categorize based on tree structure
+          for (const field of treeFields) {
+            try {
+              // Build a flat list of all categories with their full paths
+              const buildCategoryList = (nodes, parentPath = []) => {
+                let categories = [];
+                for (const node of nodes) {
+                  const currentPath = [...parentPath, node.name];
+                  const fullPath = currentPath.join(' > ');
+
+                  let entry = `- ID: "${node.id}" | Path: "${fullPath}"`;
+                  if (node.text) {
+                    entry += ` | Hint: "${node.text}"`;
+                  }
+                  categories.push(entry);
+
+                  if (node.children && node.children.length > 0) {
+                    categories = categories.concat(buildCategoryList(node.children, currentPath));
+                  }
+                }
+                return categories;
+              };
+
+              // Collect all valid node IDs for the enum
+              const collectNodeIds = (nodes) => {
+                let ids = [];
+                for (const node of nodes) {
+                  ids.push(node.id);
+                  if (node.children && node.children.length > 0) {
+                    ids = ids.concat(collectNodeIds(node.children));
+                  }
+                }
+                return ids;
+              };
+
+              const categoryList = buildCategoryList(field.treeData).join('\n');
+              const validNodeIds = collectNodeIds(field.treeData);
+
+              // Build context from analysis
+              const analysisContext = `
+Garment information:
+- Name: ${analysis.name || 'Unknown'}
+- Category: ${analysis.category || 'Unknown'}
+- Subcategory: ${analysis.subcategory || 'Unknown'}
+- Style: ${analysis.style || 'Unknown'}
+- Color: ${analysis.color || 'Unknown'}
+- Material: ${analysis.material || 'Unknown'}
+- Fit: ${analysis.fit || 'Unknown'}
+- Suggested gender: ${analysis.suggested_gender || 'Unknown'}
+`;
+
+              const treeAnalysis = await base44.integrations.Core.InvokeLLM({
+                prompt: `You are categorizing a garment into a category tree for the field "${field.label}".
+
+Here are all available categories. Each has an ID, a full path showing its position in the hierarchy, and optionally a hint:
+
+${categoryList}
+
+${analysisContext}
+
+IMPORTANT: Pay close attention to the FULL PATH of each category. For example, "Male > Shoes > Sneakers" is different from "Female > Shoes > Sneakers". The garment must match ALL levels of the path, not just the leaf category name.
+
+Based on the garment image and the information above, determine which category this garment belongs to. Pick the MOST SPECIFIC category where the garment matches the ENTIRE path from root to leaf. Return ONLY the node ID of the best matching category.`,
+                file_urls: [processedUrl],
+                response_json_schema: {
+                  type: 'object',
+                  properties: {
+                    node_id: {
+                      type: 'string',
+                      description: 'The ID of the matching category node',
+                      enum: validNodeIds
+                    },
+                    confidence: {
+                      type: 'string',
+                      enum: ['high', 'medium', 'low'],
+                      description: 'How confident are you in this categorization'
+                    }
+                  },
+                  required: ['node_id']
+                }
+              });
+
+              if (treeAnalysis?.node_id && validNodeIds.includes(treeAnalysis.node_id)) {
+                newCustomValues[field.id] = treeAnalysis.node_id;
+              }
+            } catch (fieldError) {
+              console.warn(`Could not auto-categorize tree field ${field.label}:`, fieldError);
+            }
+          }
+
+          setCustomFieldValues(newCustomValues);
         }
       } else {
         console.error('Ogiltig analys:', analysis);
@@ -725,7 +874,8 @@ export default function Upload() {
             }
             garment = await createGarmentMutation.mutateAsync({
               ...garmentData,
-              image_url: uploadedUrl
+              image_url: uploadedUrl,
+              custom_field_values: Object.keys(customFieldValues).length > 0 ? customFieldValues : null
             });
             garmentId = garment.id;
             setSelectedGarmentId(garmentId);
@@ -1438,6 +1588,7 @@ export default function Upload() {
                   setUploadedUrl(null);
                   setAiSuggestions(null);
                   setGarmentData({ name: '', category: '', brand: '', sku: '' });
+                  setCustomFieldValues({});
                 }}
               />
               
@@ -1458,6 +1609,15 @@ export default function Upload() {
                             brand: garment.brand || '',
                             sku: garment.sku || ''
                           });
+                          // Load custom field values if they exist
+                          if (garment.custom_field_values) {
+                            const values = typeof garment.custom_field_values === 'string'
+                              ? JSON.parse(garment.custom_field_values)
+                              : garment.custom_field_values;
+                            setCustomFieldValues(values || {});
+                          } else {
+                            setCustomFieldValues({});
+                          }
                           setUploadedUrl(garment.image_url);
                           setPreview(garment.image_url);
                           setOpenSectionWithScroll('details');
@@ -1724,6 +1884,36 @@ export default function Upload() {
                     className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white"
                   />
                 </div>
+
+                {/* Customer-specific custom fields */}
+                {customFields.length > 0 && (
+                  <div className="pt-4 border-t border-black/10 dark:border-white/10 space-y-4">
+                    <p className="text-sm font-medium text-black/60 dark:text-white/60">
+                      {customer?.name ? `${customer.name}-specifik information` : 'Ytterligare information'}
+                    </p>
+                    {customFields.map((field) => (
+                      <div key={field.id}>
+                        <Label className="text-black/80 dark:text-white/80">{field.label || 'Utan etikett'}</Label>
+                        {field.type === 'tree' && field.treeData?.length > 0 ? (
+                          <TreeSelector
+                            treeData={field.treeData}
+                            value={customFieldValues[field.id] || ''}
+                            onChange={(value) => setCustomFieldValues(prev => ({ ...prev, [field.id]: value }))}
+                            placeholder="Välj kategori..."
+                            className="mt-2"
+                          />
+                        ) : (
+                          <Input
+                            value={customFieldValues[field.id] || ''}
+                            onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                            placeholder="Valfritt"
+                            className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </AccordionSection>
           )}

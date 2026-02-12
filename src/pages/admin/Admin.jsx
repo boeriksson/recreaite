@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,28 +48,42 @@ import { useCustomer } from '@/lib/CustomerContext';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/amplifyClient';
 
-const AdminCard = ({ to, icon: Icon, title, description, badge, disabled }) => (
-  <Link
-    to={disabled ? '#' : to}
-    className={disabled ? 'cursor-not-allowed' : ''}
-  >
-    <Card className={`transition-all ${disabled ? 'opacity-50' : 'hover:shadow-md hover:border-primary/50'}`}>
-      <CardHeader className="flex flex-row items-center gap-4">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Icon className="h-6 w-6 text-primary" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{title}</CardTitle>
-            {badge && <Badge variant="secondary">{badge}</Badge>}
+const AdminCard = ({ to, icon: Icon, title, description, badge, disabled, onNavigate }) => {
+  const handleClick = (e) => {
+    if (disabled) {
+      e.preventDefault();
+      return;
+    }
+    if (onNavigate) {
+      e.preventDefault();
+      onNavigate(to);
+    }
+  };
+
+  return (
+    <Link
+      to={disabled ? '#' : to}
+      className={disabled ? 'cursor-not-allowed' : ''}
+      onClick={handleClick}
+    >
+      <Card className={`transition-all ${disabled ? 'opacity-50' : 'hover:shadow-md hover:border-primary/50'}`}>
+        <CardHeader className="flex flex-row items-center gap-4">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Icon className="h-6 w-6 text-primary" />
           </div>
-          <CardDescription>{description}</CardDescription>
-        </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-      </CardHeader>
-    </Card>
-  </Link>
-);
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg">{title}</CardTitle>
+              {badge && <Badge variant="secondary">{badge}</Badge>}
+            </div>
+            <CardDescription>{description}</CardDescription>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+      </Card>
+    </Link>
+  );
+};
 
 // Tree node component for recursive rendering
 const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, setEditingId, expandedNodes, toggleExpanded, isLast = false, parentLines = [] }) => {
@@ -69,20 +93,30 @@ const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, 
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedNodes.has(node.id);
 
-  // Update edit values when node changes
+  // Sync local state with node prop
   useEffect(() => {
     setEditName(node.name);
     setEditText(node.text || '');
   }, [node.name, node.text]);
 
-  const handleSave = () => {
-    onUpdate(node.id, { name: editName, text: editText });
+  // Auto-save changes on every keystroke (only update the changed field to avoid stale closures)
+  const handleNameChange = (e) => {
+    const newValue = e.target.value;
+    setEditName(newValue);
+    onUpdate(node.id, { name: newValue });
+  };
+
+  const handleTextChange = (e) => {
+    const newValue = e.target.value;
+    setEditText(newValue);
+    onUpdate(node.id, { text: newValue });
+  };
+
+  const handleFinishEditing = () => {
     setEditingId(null);
   };
 
   const handleCancel = () => {
-    setEditName(node.name);
-    setEditText(node.text || '');
     setEditingId(null);
   };
 
@@ -132,26 +166,26 @@ const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, 
             <>
               <Input
                 value={editName}
-                onChange={(e) => setEditName(e.target.value)}
+                onChange={handleNameChange}
                 placeholder="Kategorinamn"
                 className="h-7 text-sm w-32 flex-shrink-0"
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Enter') handleFinishEditing();
                   if (e.key === 'Escape') handleCancel();
                 }}
               />
               <Input
                 value={editText}
-                onChange={(e) => setEditText(e.target.value)}
+                onChange={handleTextChange}
                 placeholder="Prompt för att hjälpa AI att placera plaggen i den här kategorin.."
                 className="h-7 text-sm flex-1 min-w-0"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Enter') handleFinishEditing();
                   if (e.key === 'Escape') handleCancel();
                 }}
               />
-              <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleSave}>
+              <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleFinishEditing}>
                 <Check className="h-3.5 w-3.5 text-green-600" />
               </Button>
               <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleCancel}>
@@ -229,9 +263,16 @@ const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, 
 };
 
 // Tree editor component
-const TreeEditor = ({ treeData = [], onChange }) => {
+const TreeEditor = ({ treeData = [], onChange, onEditingChange }) => {
   const [editingId, setEditingId] = useState(null);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+
+  // Notify parent when editing state changes
+  useEffect(() => {
+    if (onEditingChange) {
+      onEditingChange(editingId !== null);
+    }
+  }, [editingId, onEditingChange]);
 
   const toggleExpanded = (nodeId) => {
     setExpandedNodes(prev => {
@@ -245,10 +286,21 @@ const TreeEditor = ({ treeData = [], onChange }) => {
     });
   };
 
+  // Remove nodes without a name (empty or only whitespace)
+  const removeUnnamedNodes = (nodes) => {
+    return nodes
+      .filter((node) => node.name && node.name.trim() !== '')
+      .map((node) => ({
+        ...node,
+        children: node.children ? removeUnnamedNodes(node.children) : []
+      }));
+  };
+
   const addRootNode = () => {
     const newId = crypto.randomUUID();
+    const cleanedTree = removeUnnamedNodes(treeData);
     onChange([
-      ...treeData,
+      ...cleanedTree,
       { id: newId, name: '', text: '', children: [] }
     ]);
     setEditingId(newId);
@@ -284,6 +336,8 @@ const TreeEditor = ({ treeData = [], onChange }) => {
 
   const addChildNode = (parentId) => {
     const newId = crypto.randomUUID();
+    // First clean up unnamed nodes
+    const cleanedTree = removeUnnamedNodes(treeData);
     const addToTree = (nodes) =>
       nodes.map((node) => {
         if (node.id === parentId) {
@@ -300,7 +354,7 @@ const TreeEditor = ({ treeData = [], onChange }) => {
         }
         return node;
       });
-    onChange(addToTree(treeData));
+    onChange(addToTree(cleanedTree));
     // Auto-expand parent when adding child
     setExpandedNodes(prev => new Set(prev).add(parentId));
     setEditingId(newId);
@@ -375,50 +429,84 @@ const ExpandableCard = ({ icon: Icon, title, description, isOpen, onToggle, chil
 );
 
 export default function Admin() {
-  const { userProfile, customer, isOwner, isAdmin, isSuperAdmin, refreshCustomer } = useCustomer();
+  const { userProfile, customer, isOwner, isAdmin, isSuperAdmin, refreshCustomerData } = useCustomer();
   const [expandedSections, setExpandedSections] = useState({});
   const [customFields, setCustomFields] = useState([]);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isEditingTree, setIsEditingTree] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(true);
+
+  // Ref to always have the latest customFields for saving (updated synchronously)
+  const customFieldsRef = React.useRef(customFields);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Load custom fields from customer
+  // Refresh customer data when Admin page loads
   useEffect(() => {
+    const doRefresh = async () => {
+      setIsRefreshing(true);
+      if (refreshCustomerData) {
+        await refreshCustomerData();
+      }
+      setIsRefreshing(false);
+    };
+    doRefresh();
+  }, []);
+
+  // Load custom fields from customer (only after refresh is done)
+  useEffect(() => {
+    if (isRefreshing) return;
+
     if (customer?.custom_fields) {
       try {
         const fields = typeof customer.custom_fields === 'string'
           ? JSON.parse(customer.custom_fields)
           : customer.custom_fields;
         setCustomFields(Array.isArray(fields) ? fields : []);
+        customFieldsRef.current = Array.isArray(fields) ? fields : [];
       } catch {
         setCustomFields([]);
+        customFieldsRef.current = [];
       }
     } else {
       setCustomFields([]);
+      customFieldsRef.current = [];
     }
     setHasChanges(false);
-  }, [customer?.id, customer?.custom_fields]);
+  }, [customer?.id, customer?.custom_fields, isRefreshing]);
 
   const addField = () => {
-    setCustomFields([
-      ...customFields,
-      { id: crypto.randomUUID(), label: '', type: 'text' }
-    ]);
+    setCustomFields(prevFields => {
+      const newFields = [
+        ...prevFields,
+        { id: crypto.randomUUID(), label: '', type: 'text' }
+      ];
+      customFieldsRef.current = newFields;
+      return newFields;
+    });
     setHasChanges(true);
   };
 
   const updateField = (id, key, value) => {
-    setCustomFields(customFields.map(f =>
-      f.id === id ? { ...f, [key]: value } : f
-    ));
+    setCustomFields(prevFields => {
+      const newFields = prevFields.map(f =>
+        f.id === id ? { ...f, [key]: value } : f
+      );
+      customFieldsRef.current = newFields;
+      return newFields;
+    });
     setHasChanges(true);
   };
 
   const removeField = (id) => {
-    setCustomFields(customFields.filter(f => f.id !== id));
+    setCustomFields(prevFields => {
+      const newFields = prevFields.filter(f => f.id !== id);
+      customFieldsRef.current = newFields;
+      return newFields;
+    });
     setHasChanges(true);
   };
 
@@ -426,16 +514,85 @@ export default function Admin() {
     if (!customer?.id) return;
     setSaving(true);
     try {
+      // Use ref to ensure we have the latest value
       await base44.entities.Customer.update(customer.id, {
-        custom_fields: JSON.stringify(customFields)
+        custom_fields: JSON.stringify(customFieldsRef.current)
       });
       setHasChanges(false);
-      if (refreshCustomer) refreshCustomer();
+      setIsEditingTree(false);
+      if (refreshCustomerData) refreshCustomerData();
     } catch (err) {
       console.error('Failed to save custom fields:', err);
       alert('Kunde inte spara: ' + err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const navigate = useNavigate();
+  const [pendingNavigation, setPendingNavigation] = useState(null);
+
+  // Warn on browser close/refresh
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasChanges || isEditingTree) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges, isEditingTree]);
+
+  // Intercept all link clicks when there are unsaved changes
+  useEffect(() => {
+    const handleLinkClick = (e) => {
+      // Only intercept if there are unsaved changes
+      if (!hasChanges && !isEditingTree) return;
+
+      // Find the closest anchor tag
+      const link = e.target.closest('a');
+      if (!link) return;
+
+      // Ignore external links, hash links, and links that open in new tabs
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('http') || link.target === '_blank') return;
+
+      // Prevent navigation and show dialog
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingNavigation(href);
+    };
+
+    document.addEventListener('click', handleLinkClick, true);
+    return () => document.removeEventListener('click', handleLinkClick, true);
+  }, [hasChanges, isEditingTree]);
+
+  // Handle navigation attempt - shows dialog if unsaved changes or editing tree
+  const handleNavigate = (to) => {
+    if (hasChanges || isEditingTree) {
+      setPendingNavigation(to);
+    } else {
+      navigate(to);
+    }
+  };
+
+  // Handle save and proceed
+  const handleSaveAndProceed = async () => {
+    await saveCustomFields();
+    if (pendingNavigation) {
+      navigate(pendingNavigation);
+      setPendingNavigation(null);
+    }
+  };
+
+  // Handle proceed without saving
+  const handleProceedWithoutSaving = () => {
+    setHasChanges(false); // Reset to prevent beforeunload
+    setIsEditingTree(false);
+    if (pendingNavigation) {
+      navigate(pendingNavigation);
+      setPendingNavigation(null);
     }
   };
 
@@ -457,6 +614,42 @@ export default function Admin() {
 
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4 space-y-6">
+      {/* Unsaved changes dialog */}
+      <AlertDialog open={pendingNavigation !== null}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Osparade ändringar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du har osparade ändringar i dina inställningar. Vill du spara innan du lämnar sidan?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingNavigation(null)}>
+              Avbryt
+            </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={handleProceedWithoutSaving}
+            >
+              Lämna utan att spara
+            </Button>
+            <AlertDialogAction
+              onClick={handleSaveAndProceed}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sparar...
+                </>
+              ) : (
+                'Spara och lämna'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <div className="p-2 rounded-lg bg-primary/10">
@@ -482,12 +675,14 @@ export default function Admin() {
             icon={Users}
             title="Team Members"
             description="View and manage users in your organization"
+            onNavigate={handleNavigate}
           />
           <AdminCard
             to={createPageUrl('admin/invite-links')}
             icon={LinkIcon}
             title="Invite Links"
             description="Create signup links to invite new users"
+            onNavigate={handleNavigate}
           />
         </div>
       </div>
@@ -532,7 +727,7 @@ export default function Admin() {
                       <div className="w-9" /> {/* Spacer for delete button */}
                     </div>
                     {customFields.map((field) => (
-                      <div key={field.id} className="space-y-4">
+                      <div key={field.id} className="space-y-3">
                         <div className="flex gap-3 items-start">
                           <div className="flex-1">
                             <Input
@@ -564,11 +759,23 @@ export default function Admin() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
+                        {/* Prompt field for text type */}
+                        {field.type === 'text' && (
+                          <div className="pl-0">
+                            <Input
+                              placeholder="Prompt för att hjälpa AI att använda detta fält..."
+                              value={field.prompt || ''}
+                              onChange={(e) => updateField(field.id, 'prompt', e.target.value)}
+                              className="text-sm text-muted-foreground"
+                            />
+                          </div>
+                        )}
                         {/* Tree editor for category tree fields */}
                         {field.type === 'tree' && (
                           <TreeEditor
                             treeData={field.treeData || []}
                             onChange={(newTreeData) => updateField(field.id, 'treeData', newTreeData)}
+                            onEditingChange={setIsEditingTree}
                           />
                         )}
                       </div>
@@ -625,6 +832,7 @@ export default function Admin() {
               icon={BarChart3}
               title="Cost Dashboard"
               description="View usage statistics and costs"
+              onNavigate={handleNavigate}
             />
           </div>
         </div>
@@ -642,18 +850,21 @@ export default function Admin() {
               icon={Building2}
               title="Customers"
               description="Create and manage all customers"
+              onNavigate={handleNavigate}
             />
             <AdminCard
               to={createPageUrl('admin/data-migration')}
               icon={Database}
               title="Data Migration"
               description="Run multi-tenant data migration"
+              onNavigate={handleNavigate}
             />
             <AdminCard
               to={createPageUrl('admin/settings')}
               icon={Settings}
               title="System Settings"
               description="Configure exchange rates and system options"
+              onNavigate={handleNavigate}
             />
           </div>
         </div>

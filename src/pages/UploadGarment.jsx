@@ -18,12 +18,22 @@ import { cn } from "@/lib/utils";
 import FileDropzone from '../components/upload/FileDropzone';
 import { useLanguage } from '../components/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
+import { useCustomer } from '@/lib/CustomerContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TreeSelector } from '@/components/ui/TreeSelector';
 
 export default function UploadGarment() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t, language } = useLanguage();
   const { isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
+  const { customer } = useCustomer();
 
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -36,9 +46,23 @@ export default function UploadGarment() {
     brand: '',
     sku: ''
   });
+  const [customFieldValues, setCustomFieldValues] = useState({});
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Parse customer's custom fields
+  const customFields = React.useMemo(() => {
+    if (!customer?.custom_fields) return [];
+    try {
+      const fields = typeof customer.custom_fields === 'string'
+        ? JSON.parse(customer.custom_fields)
+        : customer.custom_fields;
+      return Array.isArray(fields) ? fields : [];
+    } catch {
+      return [];
+    }
+  }, [customer?.custom_fields]);
 
   // Redirect to login if not authenticated
   React.useEffect(() => {
@@ -145,7 +169,8 @@ export default function UploadGarment() {
       ...garmentData,
       image_url: uploadedUrl,
       original_image_url: garmentData.original_image_url,
-      ai_description: aiSuggestions?.description || ''
+      ai_description: aiSuggestions?.description || '',
+      custom_field_values: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined
     });
   };
 
@@ -189,6 +214,7 @@ export default function UploadGarment() {
                 setUploadedUrl(null);
                 setAiSuggestions(null);
                 setGarmentData({ name: '', category: '', brand: '', sku: '' });
+                setCustomFieldValues({});
               }}
             />
           </div>
@@ -322,6 +348,36 @@ export default function UploadGarment() {
                     className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white"
                   />
                 </div>
+
+                {/* Customer-specific custom fields */}
+                {customFields.length > 0 && (
+                  <div className="pt-4 border-t border-black/10 dark:border-white/10 space-y-4">
+                    <p className="text-sm font-medium text-black/60 dark:text-white/60">
+                      {customer?.name ? `${customer.name}-specifik information` : 'Ytterligare information'}
+                    </p>
+                    {customFields.map((field) => (
+                      <div key={field.id}>
+                        <Label className="text-black/80 dark:text-white/80">{field.label || 'Utan etikett'}</Label>
+                        {field.type === 'tree' && field.treeData?.length > 0 ? (
+                          <TreeSelector
+                            treeData={field.treeData}
+                            value={customFieldValues[field.id] || ''}
+                            onChange={(value) => setCustomFieldValues(prev => ({ ...prev, [field.id]: value }))}
+                            placeholder="Välj kategori..."
+                            className="mt-2"
+                          />
+                        ) : (
+                          <Input
+                            value={customFieldValues[field.id] || ''}
+                            onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                            placeholder={t.optional}
+                            className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <Button
                   onClick={handleSave}

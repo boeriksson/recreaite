@@ -27,6 +27,8 @@ export const Garment = a.model({
   suggested_gender: a.string(), // Suggested model gender
   fit: a.string(),            // Fit description
   complementary_items: a.json(), // Array of complementary items
+  // Customer-specific custom field values (JSON object keyed by field ID)
+  custom_field_values: a.json(),
 }).authorization((allow) => [
   allow.owner(),
   allow.authenticated(),
