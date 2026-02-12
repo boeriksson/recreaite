@@ -17,7 +17,9 @@ import {
   Search,
   Filter,
   ChevronDown,
-  Tag
+  Tag,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { SignedImage } from "@/components/ui/SignedImage";
@@ -47,10 +49,18 @@ import { createPageUrl } from '../utils';
 import ImageRefinementPanel from '../components/generation/ImageRefinementPanel';
 import { useLanguage } from '../components/LanguageContext';
 import AICategorizationPanel from '../components/gallery/AICategorizationPanel';
+import { useCustomer } from '@/lib/CustomerContext';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function Gallery() {
   const queryClient = useQueryClient();
   const { t, language } = useLanguage();
+  const { isSuperAdmin } = useCustomer();
   const [selectedImage, setSelectedImage] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [editingImage, setEditingImage] = useState(null);
@@ -72,6 +82,7 @@ export default function Gallery() {
   const [generatingGarmentDescription, setGeneratingGarmentDescription] = useState(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [copiedPromptId, setCopiedPromptId] = useState(null);
 
   // Prevent body scroll when lightbox is open
   React.useEffect(() => {
@@ -828,7 +839,7 @@ export default function Gallery() {
           {/* Completed Images */}
           {paginatedImages.map((image, index) => {
             const garment = getGarment(image.garment_id);
-            return (
+            const imageContent = (
               <motion.div
                 key={image.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -929,6 +940,46 @@ export default function Gallery() {
                 </div>
               </motion.div>
             );
+
+            // Wrap with tooltip for super admins
+            if (isSuperAdmin() && image.prompt_used) {
+              return (
+                <TooltipProvider key={image.id} delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      {imageContent}
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      className="max-w-md bg-black/90 text-white text-xs p-3 rounded-lg border border-white/20"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="font-medium text-white/60">Prompt:</p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(image.prompt_used);
+                            setCopiedPromptId(image.id);
+                            setTimeout(() => setCopiedPromptId(null), 2000);
+                          }}
+                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          title="Kopiera prompt"
+                        >
+                          {copiedPromptId === image.id ? (
+                            <Check className="h-3.5 w-3.5 text-green-400" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5 text-white/60 hover:text-white" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="whitespace-pre-wrap break-words">{image.prompt_used}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            }
+
+            return imageContent;
           })}
         </div>
 

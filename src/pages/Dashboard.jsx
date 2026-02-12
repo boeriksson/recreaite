@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { useQuery } from '@tanstack/react-query';
@@ -11,16 +11,27 @@ import {
   Sparkles,
   TrendingUp,
   Clock,
-  User
+  User,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { sv, enUS } from 'date-fns/locale';
 import { useLanguage } from '../components/LanguageContext';
 import { SignedImage } from '@/components/ui/SignedImage';
+import { useCustomer } from '@/lib/CustomerContext';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function Dashboard() {
   const { t, language } = useLanguage();
+  const { isSuperAdmin } = useCustomer();
+  const [copiedPromptId, setCopiedPromptId] = useState(null);
   // Full data for stats
   const { data: allGarments = [] } = useQuery({
     queryKey: ['all-garments'],
@@ -171,24 +182,64 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {generatedImages.slice(0, 6).map((image) => (
-                <div
-                  key={image.id}
-                  className="aspect-[3/4] rounded-2xl bg-[#f5f5f7] overflow-hidden group cursor-pointer hover:shadow-lg transition-shadow"
-                >
-                  {image.image_url ? (
-                    <SignedImage
-                      src={image.image_url}
-                      alt="Generated"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Sparkles className="h-8 w-8 text-black/20" />
-                    </div>
-                  )}
-                </div>
-              ))}
+              {generatedImages.slice(0, 6).map((image) => {
+                const imageCard = (
+                  <div
+                    className="aspect-[3/4] rounded-2xl bg-[#f5f5f7] overflow-hidden group cursor-pointer hover:shadow-lg transition-shadow"
+                  >
+                    {image.image_url ? (
+                      <SignedImage
+                        src={image.image_url}
+                        alt="Generated"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Sparkles className="h-8 w-8 text-black/20" />
+                      </div>
+                    )}
+                  </div>
+                );
+
+                if (isSuperAdmin() && image.prompt_used) {
+                  return (
+                    <TooltipProvider key={image.id} delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {imageCard}
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-md bg-black/90 text-white text-xs p-3 rounded-lg border border-white/20"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-medium text-white/60">Prompt:</p>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(image.prompt_used);
+                                setCopiedPromptId(image.id);
+                                setTimeout(() => setCopiedPromptId(null), 2000);
+                              }}
+                              className="p-1 hover:bg-white/20 rounded transition-colors"
+                              title="Kopiera prompt"
+                            >
+                              {copiedPromptId === image.id ? (
+                                <Check className="h-3.5 w-3.5 text-green-400" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5 text-white/60 hover:text-white" />
+                              )}
+                            </button>
+                          </div>
+                          <p className="whitespace-pre-wrap break-words">{image.prompt_used}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                }
+
+                return <div key={image.id}>{imageCard}</div>;
+              })}
             </div>
           )}
         </motion.div>

@@ -15,16 +15,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Sparkles, Loader2, ChevronDown, Lightbulb, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Sparkles, Loader2, ChevronDown, Lightbulb, Upload, Image as ImageIcon, Copy, Check } from 'lucide-react';
+import { useCustomer } from '@/lib/CustomerContext';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function ModelGenerator({ onClose, onSave, darkMode }) {
   const { isAuthenticated, navigateToLogin } = useAuth();
+  const { isSuperAdmin } = useCustomer();
   const [generating, setGenerating] = useState(false);
   const [portraitImage, setPortraitImage] = useState(null);
+  const [usedPrompt, setUsedPrompt] = useState(null);
   const [showExpert, setShowExpert] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [referenceImages, setReferenceImages] = useState([]);
   const [uploadingReference, setUploadingReference] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   
   const [modelData, setModelData] = useState({
     name: '',
@@ -84,17 +94,19 @@ export default function ModelGenerator({ onClose, onSave, darkMode }) {
       }
       
       console.log('Generating portrait...');
+      const fullPrompt = `${portraitPrompt} 4:5 aspect ratio, portrait orientation.`;
       const portraitResult = await base44.integrations.Core.GenerateImage({
-        prompt: `${portraitPrompt} 4:5 aspect ratio, portrait orientation.`,
+        prompt: fullPrompt,
         existing_image_urls: referenceImages.length > 0 ? referenceImages : undefined
       });
-      
+
       if (!portraitResult?.url) {
         throw new Error('Portrait generation failed - no URL returned');
       }
-      
+
       console.log('Portrait generated:', portraitResult.url);
       setPortraitImage(portraitResult.url);
+      setUsedPrompt(fullPrompt);
     } catch (error) {
       console.error('Generation failed:', error);
       alert(`Fel vid generering: ${error.message}. Försök igen eller kontrollera konsolen för mer information.`);
@@ -390,22 +402,63 @@ export default function ModelGenerator({ onClose, onSave, darkMode }) {
 
           {/* Preview */}
           <div className="space-y-4">
-            <div className={`aspect-[3/4] rounded-2xl ${darkMode ? 'bg-[#2a2a2a]' : 'bg-[#e8e8e8]'} overflow-hidden`}>
-              {portraitImage ? (
-                <img 
-                  src={portraitImage} 
-                  alt="Portrait"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <Sparkles className={`h-8 w-8 ${darkMode ? 'text-white/20' : 'text-black/20'} mx-auto mb-2`} />
-                    <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>Headshot</p>
+            {isSuperAdmin() && portraitImage && usedPrompt ? (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={`aspect-[3/4] rounded-2xl ${darkMode ? 'bg-[#2a2a2a]' : 'bg-[#e8e8e8]'} overflow-hidden cursor-help`}>
+                      <img
+                        src={portraitImage}
+                        alt="Portrait"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="left"
+                    className="max-w-md bg-black/90 text-white text-xs p-3 rounded-lg border border-white/20"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="font-medium text-white/60">Prompt:</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(usedPrompt);
+                          setPromptCopied(true);
+                          setTimeout(() => setPromptCopied(false), 2000);
+                        }}
+                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        title="Kopiera prompt"
+                      >
+                        {promptCopied ? (
+                          <Check className="h-3.5 w-3.5 text-green-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-white/60 hover:text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <p className="whitespace-pre-wrap break-words">{usedPrompt}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <div className={`aspect-[3/4] rounded-2xl ${darkMode ? 'bg-[#2a2a2a]' : 'bg-[#e8e8e8]'} overflow-hidden`}>
+                {portraitImage ? (
+                  <img
+                    src={portraitImage}
+                    alt="Portrait"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <Sparkles className={`h-8 w-8 ${darkMode ? 'text-white/20' : 'text-black/20'} mx-auto mb-2`} />
+                      <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>Headshot</p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <Button
               onClick={handleGenerate}
