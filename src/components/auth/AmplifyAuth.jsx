@@ -223,14 +223,14 @@ const AmplifyAuth = () => {
             <Sparkles className="h-6 w-6 text-white" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-1">Välkommen till HeyLook</h2>
-          <p className="text-gray-500 text-sm">Logga in eller skapa ett konto</p>
+          <p className="text-gray-500 text-sm">Logga in för att fortsätta</p>
         </div>
 
         {/* Authenticator component */}
         <div className="px-5 pb-4 w-full overflow-hidden">
           <ThemeProvider theme={theme}>
             <Authenticator
-              signUpAttributes={['email']}
+              hideSignUp={true}
               loginMechanisms={['email']}
               formFields={{
                 signIn: {

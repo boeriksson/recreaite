@@ -22,6 +22,9 @@ export const Customer = a.model({
   // Billing
   surcharge_percent: a.float().default(0),  // Markup percentage on usage costs
 
+  // Custom configuration fields (JSON array of {id, label, value, type})
+  custom_fields: a.json(),
+
   status: a.enum(['active', 'suspended', 'cancelled']),
 }).authorization((allow) => [
   allow.owner(),
