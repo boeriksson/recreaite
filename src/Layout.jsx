@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { useAuth } from '@/lib/AuthContext';
 import { useCustomer } from '@/lib/CustomerContext';
@@ -35,13 +35,36 @@ const INVITE_FRESH_KEY = 'invite_fresh'; // Flag to indicate we just arrived wit
 export default function Layout({ children, currentPageName }) {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const { customer, userProfile } = useCustomer();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showInviteSignup, setShowInviteSignup] = useState(false);
 
+  // Check if we're on the landing page
+  const isLandingPage = currentPageName === 'Landing' || location.pathname === '/' || location.pathname === '/Landing';
+
+  // Redirect to landing page if not authenticated and not on landing page
+  useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated && !isLandingPage) {
+      // Check if there's an invite code - allow staying on page with invite
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasInvite = urlParams.get('invite') || sessionStorage.getItem(INVITE_CODE_KEY);
+      if (!hasInvite) {
+        navigate(createPageUrl('Landing'));
+      }
+    }
+  }, [isAuthenticated, isLoadingAuth, isLandingPage, navigate]);
+
+  // Handle logout with redirect
+  const handleLogout = () => {
+    logout();
+    navigate(createPageUrl('Landing'));
+  };
+
   // Check for invite code and show invite signup if not authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     // Wait for auth to finish loading
     if (isLoadingAuth) return;
 
@@ -109,24 +132,24 @@ export default function Layout({ children, currentPageName }) {
       {/* Navigation */}
       <nav className={cn(
         "fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors",
-        darkMode 
-          ? "bg-black/80 border-white/10" 
+        darkMode
+          ? "bg-black/80 border-white/10"
           : "bg-white/80 border-black/5"
       )}>
         <div className="max-w-[980px] mx-auto px-5">
           <div className="flex items-center justify-between h-11">
             {/* Logo */}
             <Link to={createPageUrl('Landing')} className="flex items-center">
-              <img 
+              <img
                 src={darkMode ? "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/694a63448589b28fcfe35847/27e727d8d_Heylooknegpng.png" : "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/694a63448589b28fcfe35847/3800fa98f_HeyLookLogoPos.png"}
                 alt="HeyLook"
                 className="h-8"
               />
             </Link>
 
-            {/* Desktop Nav */}
+            {/* Desktop Nav - only show menu items when authenticated */}
             <div className="hidden md:flex items-center gap-8">
-              {navItems.map((item) => {
+              {isAuthenticated && navItems.map((item) => {
                 const isActive = currentPageName === item.page;
                 return (
                   <Link
@@ -143,22 +166,24 @@ export default function Layout({ children, currentPageName }) {
                   </Link>
                 );
               })}
-              
-              {/* Dark Mode Toggle */}
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className={cn(
-                  "ml-4 px-3 py-1.5 rounded-full text-xs transition-colors",
-                  darkMode 
-                    ? "bg-white/10 text-white hover:bg-white/20" 
-                    : "bg-black/5 text-black hover:bg-black/10"
-                )}
-              >
-                {darkMode ? '☀️' : '🌙'}
-              </button>
 
-              {/* User Menu */}
-              {isAuthenticated && user ? (
+              {/* Dark Mode Toggle - only when authenticated */}
+              {isAuthenticated && (
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={cn(
+                    "ml-4 px-3 py-1.5 rounded-full text-xs transition-colors",
+                    darkMode
+                      ? "bg-white/10 text-white hover:bg-white/20"
+                      : "bg-black/5 text-black hover:bg-black/10"
+                  )}
+                >
+                  {darkMode ? '☀️' : '🌙'}
+                </button>
+              )}
+
+              {/* User Menu or Login Button */}
+              {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className={cn(
@@ -171,7 +196,7 @@ export default function Layout({ children, currentPageName }) {
                   <DropdownMenuContent align="end" className={darkMode ? "bg-[#1a1a1a] border-white/10" : "bg-white border-black/10"}>
                     <div className="px-2 py-1.5">
                       <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-black'}`}>
-                        {user.full_name || user.email}
+                        {user?.full_name || user?.email}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
                         {customer?.name || 'No organization'}
@@ -188,7 +213,7 @@ export default function Layout({ children, currentPageName }) {
                         </Link>
                       </>
                     )}
-                    <DropdownMenuItem onClick={() => logout()} className={darkMode ? "text-white" : "text-black"}>
+                    <DropdownMenuItem onClick={handleLogout} className={darkMode ? "text-white" : "text-black"}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Logga ut
                     </DropdownMenuItem>
@@ -204,18 +229,27 @@ export default function Layout({ children, currentPageName }) {
               )}
             </div>
 
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            {/* Mobile: Login button when not authenticated, Menu button when authenticated */}
+            {isAuthenticated ? (
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-1"
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowLogin(true)}
+                className="md:hidden px-4 py-1.5 bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full text-xs font-medium transition-colors"
+              >
+                Logga in
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
+        {/* Mobile Menu - only when authenticated */}
+        {isAuthenticated && mobileMenuOpen && (
           <div className={cn(
             "md:hidden border-t transition-colors",
             darkMode ? "border-white/10 bg-black" : "border-black/10 bg-white"
@@ -230,7 +264,7 @@ export default function Layout({ children, currentPageName }) {
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
                       "block py-3 text-sm border-b",
-                      darkMode 
+                      darkMode
                         ? (isActive ? "text-white border-white/5" : "text-white/60 border-white/5")
                         : (isActive ? "text-black border-black/5" : "text-black/60 border-black/5")
                     )}
