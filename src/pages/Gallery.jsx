@@ -50,12 +50,6 @@ import ImageRefinementPanel from '../components/generation/ImageRefinementPanel'
 import { useLanguage } from '../components/LanguageContext';
 import AICategorizationPanel from '../components/gallery/AICategorizationPanel';
 import { useCustomer } from '@/lib/CustomerContext';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 export default function Gallery() {
   const queryClient = useQueryClient();
@@ -80,7 +74,6 @@ export default function Gallery() {
   const [generatingVariations, setGeneratingVariations] = useState(false);
   const [variationCount, setVariationCount] = useState(3);
   const [generatingGarmentDescription, setGeneratingGarmentDescription] = useState(null);
-  const [promptExpanded, setPromptExpanded] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [copiedPromptId, setCopiedPromptId] = useState(null);
 
@@ -941,44 +934,6 @@ export default function Gallery() {
               </motion.div>
             );
 
-            // Wrap with tooltip for super admins
-            if (isSuperAdmin() && image.prompt_used) {
-              return (
-                <TooltipProvider key={image.id} delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      {imageContent}
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="top"
-                      className="max-w-md bg-black/90 text-white text-xs p-3 rounded-lg border border-white/20"
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <p className="font-medium text-white/60">Prompt:</p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(image.prompt_used);
-                            setCopiedPromptId(image.id);
-                            setTimeout(() => setCopiedPromptId(null), 2000);
-                          }}
-                          className="p-1 hover:bg-white/20 rounded transition-colors"
-                          title="Kopiera prompt"
-                        >
-                          {copiedPromptId === image.id ? (
-                            <Check className="h-3.5 w-3.5 text-green-400" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5 text-white/60 hover:text-white" />
-                          )}
-                        </button>
-                      </div>
-                      <p className="whitespace-pre-wrap break-words">{image.prompt_used}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            }
-
             return imageContent;
           })}
         </div>
@@ -1560,21 +1515,30 @@ export default function Gallery() {
                   );
                 })()}
 
-                {/* Prompt */}
-                {infoImage.prompt_used && (
+                {/* Prompt (Superadmin only) */}
+                {isSuperAdmin() && infoImage.prompt_used && (
                   <div>
-                    <button
-                      onClick={() => setPromptExpanded(!promptExpanded)}
-                      className="w-full flex items-center justify-between text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors mb-3"
-                    >
-                      <span>{t.promptUsed || 'Använd prompt'}</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform ${promptExpanded ? 'rotate-180' : ''}`} />
-                    </button>
-                    {promptExpanded && (
-                      <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg text-xs text-black dark:text-white font-mono whitespace-pre-wrap break-words">
-                        {infoImage.prompt_used}
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-black/60 dark:text-white/60">Prompt</h3>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(infoImage.prompt_used);
+                          setCopiedPromptId(infoImage.id);
+                          setTimeout(() => setCopiedPromptId(null), 2000);
+                        }}
+                        className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors"
+                        title="Kopiera prompt"
+                      >
+                        {copiedPromptId === infoImage.id ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Copy className="h-4 w-4 text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg text-xs text-black dark:text-white font-mono whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                      {infoImage.prompt_used}
+                    </div>
                   </div>
                 )}
 

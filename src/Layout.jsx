@@ -220,12 +220,22 @@ export default function Layout({ children, currentPageName }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="ml-4 px-4 py-1.5 bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full text-xs font-medium transition-colors"
-                >
-                  Logga in
-                </button>
+                <div className="flex items-center gap-2 ml-4">
+                  <a
+                    href="https://calendly.com/heylook/demo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-7 px-4 flex items-center border border-[#392599] text-[#392599] hover:bg-[#392599]/10 rounded-full text-xs font-medium transition-colors"
+                  >
+                    Book demo
+                  </a>
+                  <button
+                    onClick={() => setShowLogin(true)}
+                    className="h-7 px-4 flex items-center bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full text-xs font-medium transition-colors"
+                  >
+                    Log in
+                  </button>
+                </div>
               )}
             </div>
 
@@ -238,12 +248,22 @@ export default function Layout({ children, currentPageName }) {
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             ) : (
-              <button
-                onClick={() => setShowLogin(true)}
-                className="md:hidden px-4 py-1.5 bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full text-xs font-medium transition-colors"
-              >
-                Logga in
-              </button>
+              <div className="md:hidden flex items-center gap-2">
+                <a
+                  href="https://calendly.com/heylook/demo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-7 px-3 flex items-center border border-[#392599] text-[#392599] hover:bg-[#392599]/10 rounded-full text-xs font-medium transition-colors"
+                >
+                  Book demo
+                </a>
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="h-7 px-3 flex items-center bg-[#392599] hover:bg-[#4a2fb3] text-white rounded-full text-xs font-medium transition-colors"
+                >
+                  Log in
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -295,57 +315,77 @@ export default function Layout({ children, currentPageName }) {
       </main>
 
       {/* Footer */}
-      <footer className={cn(
-        "border-t transition-colors py-16 px-5",
-        darkMode ? "border-white/10" : "border-black/10"
-      )}>
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-            <div>
-              <div className="mb-4">
-                <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/694a63448589b28fcfe35847/27e727d8d_Heylooknegpng.png"
-                  alt="HeyLook"
-                  className="h-8"
-                />
-              </div>
-              <p className={cn("text-sm", darkMode ? "text-white/60" : "text-black/60")}>
+      {isLandingPage ? (
+        <footer className="relative z-40 backdrop-blur-xl bg-white/80 border-t border-black/5 px-6 py-8">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/694a63448589b28fcfe35847/3800fa98f_HeyLookLogoPos.png"
+                alt="HeyLook"
+                className="h-10"
+              />
+              <p className="text-base text-black/60 hidden sm:block">
                 AI-driven produktfotografering för e-handel
               </p>
             </div>
-            <div>
-              <h4 className={cn("font-medium mb-4", darkMode ? "text-white" : "text-black")}>Produkt</h4>
-              <ul className={cn("space-y-2 text-sm", darkMode ? "text-white/60" : "text-black/60")}>
-                <li><Link to={createPageUrl('Upload')} className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Generera</Link></li>
-                <li><Link to={createPageUrl('Gallery')} className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Galleri</Link></li>
-                <li><Link to={createPageUrl('Dashboard')} className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Dashboard</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className={cn("font-medium mb-4", darkMode ? "text-white" : "text-black")}>Företag</h4>
-              <ul className={cn("space-y-2 text-sm", darkMode ? "text-white/60" : "text-black/60")}>
-                <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Om oss</a></li>
-                <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Kontakt</a></li>
-                <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Karriär</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className={cn("font-medium mb-4", darkMode ? "text-white" : "text-black")}>Legal</h4>
-              <ul className={cn("space-y-2 text-sm", darkMode ? "text-white/60" : "text-black/60")}>
-                <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Integritetspolicy</a></li>
-                <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Användarvillkor</a></li>
-                <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Cookies</a></li>
-              </ul>
+            <div className="text-base text-black/40">
+              © 2026 HeyLook
             </div>
           </div>
-          <div className={cn(
-            "pt-8 border-t text-center text-sm",
-            darkMode ? "border-white/10 text-white/40" : "border-black/10 text-black/40"
-            )}>
-            © 2025 HeyLook. All rights reserved.
+        </footer>
+      ) : (
+        <footer className={cn(
+          "border-t transition-colors py-16 px-5",
+          darkMode ? "border-white/10" : "border-black/10"
+        )}>
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+              <div>
+                <div className="mb-4">
+                  <img
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/694a63448589b28fcfe35847/27e727d8d_Heylooknegpng.png"
+                    alt="HeyLook"
+                    className="h-8"
+                  />
+                </div>
+                <p className={cn("text-sm", darkMode ? "text-white/60" : "text-black/60")}>
+                  AI-driven produktfotografering för e-handel
+                </p>
+              </div>
+              <div>
+                <h4 className={cn("font-medium mb-4", darkMode ? "text-white" : "text-black")}>Produkt</h4>
+                <ul className={cn("space-y-2 text-sm", darkMode ? "text-white/60" : "text-black/60")}>
+                  <li><Link to={createPageUrl('Upload')} className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Generera</Link></li>
+                  <li><Link to={createPageUrl('Gallery')} className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Galleri</Link></li>
+                  <li><Link to={createPageUrl('Dashboard')} className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Dashboard</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className={cn("font-medium mb-4", darkMode ? "text-white" : "text-black")}>Företag</h4>
+                <ul className={cn("space-y-2 text-sm", darkMode ? "text-white/60" : "text-black/60")}>
+                  <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Om oss</a></li>
+                  <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Kontakt</a></li>
+                  <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Karriär</a></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className={cn("font-medium mb-4", darkMode ? "text-white" : "text-black")}>Legal</h4>
+                <ul className={cn("space-y-2 text-sm", darkMode ? "text-white/60" : "text-black/60")}>
+                  <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Integritetspolicy</a></li>
+                  <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Användarvillkor</a></li>
+                  <li><a href="#" className={cn("transition", darkMode ? "hover:text-white" : "hover:text-black")}>Cookies</a></li>
+                </ul>
+              </div>
             </div>
-        </div>
-      </footer>
+            <div className={cn(
+              "pt-8 border-t text-center text-sm",
+              darkMode ? "border-white/10 text-white/40" : "border-black/10 text-black/40"
+              )}>
+              © 2026 HeyLook. All rights reserved.
+              </div>
+          </div>
+        </footer>
+      )}
 
       {/* Modals */}
       {showInviteSignup && (

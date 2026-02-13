@@ -121,49 +121,54 @@ export default function FileDropzone({ onFileSelect, uploading, preview, onClear
           </button>
         </div>
       ) : (
-        <div className="relative rounded-xl overflow-hidden bg-[#f5f5f7] dark:bg-white/5">
-          {!showFullSize ? (
-            <>
-              <SignedImage 
-                src={preview} 
-                alt="Preview" 
-                className="w-full h-32 object-cover cursor-pointer"
-                onClick={() => setShowFullSize(true)}
-              />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClear();
-                }}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </>
-          ) : (
-            <>
-              <SignedImage 
-                src={preview} 
-                alt="Preview" 
-                className="w-full aspect-square object-contain cursor-pointer"
-                onClick={() => setShowFullSize(false)}
-              />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClear();
-                }}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </>
-          )}
-          {uploading && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
+        <div className="flex items-start gap-3">
+          <div className="relative rounded-xl overflow-hidden bg-[#f5f5f7] dark:bg-white/5 flex-shrink-0">
+            {!showFullSize ? (
+              <>
+                <SignedImage
+                  src={preview}
+                  alt="Preview"
+                  className="h-24 w-auto object-contain cursor-pointer"
+                  onClick={() => setShowFullSize(true)}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClear();
+                  }}
+                  className="absolute top-1 right-1 p-1 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            ) : (
+              <>
+                <SignedImage
+                  src={preview}
+                  alt="Preview"
+                  className="max-h-80 w-auto object-contain cursor-pointer"
+                  onClick={() => setShowFullSize(false)}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClear();
+                  }}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </>
+            )}
+            {uploading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 text-sm text-black/60 dark:text-white/60">
+            <p>{showFullSize ? 'Klicka på bilden för att minimera' : 'Klicka på bilden för att förstora'}</p>
+          </div>
         </div>
       )}
     </div>

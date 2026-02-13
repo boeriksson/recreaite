@@ -78,6 +78,10 @@ export const AuthProvider = ({ children }) => {
           console.log('User signed in');
           checkUserAuth();
           setShowLoginModal(false);
+          // Redirect to Dashboard after login if on Landing page
+          if (window.location.pathname === '/' || window.location.pathname === '/Landing') {
+            window.location.href = '/Dashboard';
+          }
           break;
         case 'signedOut':
           console.log('User signed out');
@@ -138,12 +142,15 @@ export const AuthProvider = ({ children }) => {
     setShowLoginModal(false);
     await checkUserAuth();
 
-    // Redirect to stored return URL if exists
+    // Redirect to stored return URL if exists, otherwise go to Dashboard
     const returnUrl = sessionStorage.getItem('amplify_return_url');
-    if (returnUrl) {
-      sessionStorage.removeItem('amplify_return_url');
-      window.location.href = returnUrl;
-    }
+    sessionStorage.removeItem('amplify_return_url');
+
+    // Default to Dashboard after login
+    const targetUrl = returnUrl && !returnUrl.endsWith('/') && !returnUrl.endsWith('/Landing')
+      ? returnUrl
+      : '/Dashboard';
+    window.location.href = targetUrl;
   };
 
   return (

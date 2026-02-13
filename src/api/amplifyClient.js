@@ -371,7 +371,7 @@ const createEntityAPI = (modelName) => {
       const jsonFields = [
         'ai_analysis', 'metadata', 'configuration', 'permissions',
         // Garment JSON fields
-        'colors', 'materials', 'style_details', 'complementary_items'
+        'colors', 'materials', 'style_details', 'complementary_items', 'custom_field_values'
       ];
 
       for (const [key, value] of Object.entries(input)) {
@@ -445,7 +445,7 @@ const createEntityAPI = (modelName) => {
       const jsonFields = [
         'ai_analysis', 'metadata', 'configuration', 'permissions',
         // Garment JSON fields
-        'colors', 'materials', 'style_details', 'complementary_items'
+        'colors', 'materials', 'style_details', 'complementary_items', 'custom_field_values'
       ];
 
       for (const [key, value] of Object.entries(input)) {

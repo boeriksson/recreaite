@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -42,7 +43,8 @@ import {
   FolderTree,
   Pencil,
   Check,
-  X
+  X,
+  Upload
 } from 'lucide-react';
 import { useCustomer } from '@/lib/CustomerContext';
 import { createPageUrl } from '@/utils';
@@ -168,7 +170,7 @@ const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, 
                 value={editName}
                 onChange={handleNameChange}
                 placeholder="Kategorinamn"
-                className="h-7 text-sm w-32 flex-shrink-0"
+                className="h-7 text-sm w-56 flex-shrink-0"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleFinishEditing();
@@ -195,7 +197,7 @@ const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, 
           ) : (
             <>
               <span
-                className={`text-sm w-32 flex-shrink-0 ${hasChildren ? 'font-medium cursor-pointer' : ''}`}
+                className={`text-sm w-56 flex-shrink-0 whitespace-nowrap ${hasChildren ? 'font-medium cursor-pointer' : ''}`}
                 onClick={() => hasChildren && toggleExpanded(node.id)}
               >
                 {node.name || <span className="text-muted-foreground/60 italic">Namnlös</span>}
@@ -266,6 +268,8 @@ const TreeNode = ({ node, level = 0, onUpdate, onDelete, onAddChild, editingId, 
 const TreeEditor = ({ treeData = [], onChange, onEditingChange }) => {
   const [editingId, setEditingId] = useState(null);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   // Notify parent when editing state changes
   useEffect(() => {
@@ -360,6 +364,185 @@ const TreeEditor = ({ treeData = [], onChange, onEditingChange }) => {
     setEditingId(newId);
   };
 
+  // Helper to transform an existing JSON tree to our format
+  const transformJsonTree = (nodes) => {
+    return nodes.map(node => {
+      const baseName = node.name || node.label || node.title || '';
+      const code = node.code;
+      const displayName = code ? `${baseName} (${code})` : baseName;
+
+      return {
+        id: node.id || node.code || crypto.randomUUID(),
+        name: displayName,
+        text: node.text || node.description || '',
+        children: node.children ? transformJsonTree(node.children) : []
+      };
+    });
+  };
+
+  // Check if a JSON structure looks like a category tree
+  const isValidCategoryTree = (data) => {
+    if (!Array.isArray(data)) return false;
+    if (data.length === 0) return true;
+    // Check first item has name/label and optionally children
+    const first = data[0];
+    return first && (first.name || first.label || first.title);
+  };
+
+  // Handle file import
+  const handleFileImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+
+    try {
+      let fileContent = '';
+      let fileUrl = null;
+      let parsedTree = null;
+
+      // Read text-based files directly
+      const textExtensions = ['.txt', '.csv', '.json', '.xml', '.md', '.tsv'];
+      const isTextFile = textExtensions.some(ext => file.name.toLowerCase().endsWith(ext)) ||
+                         file.type.startsWith('text/') ||
+                         file.type === 'application/json';
+
+      if (isTextFile) {
+        // Read file content directly
+        fileContent = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+
+        // For JSON files, try to parse and transform directly first
+        if (file.name.toLowerCase().endsWith('.json') || file.type === 'application/json') {
+          try {
+            const jsonData = JSON.parse(fileContent);
+            if (isValidCategoryTree(jsonData)) {
+              // Direct transformation - no AI needed!
+              parsedTree = transformJsonTree(jsonData);
+              console.log('Direct JSON import successful, transformed', parsedTree.length, 'root categories');
+            }
+          } catch (jsonErr) {
+            console.log('File is not valid JSON, will use AI to parse');
+          }
+        }
+      } else {
+        // Upload binary files to S3 first
+        const uploadResult = await base44.integrations.Core.UploadFile({ file });
+        fileUrl = uploadResult.file_url;
+      }
+
+      // If we couldn't parse directly, use AI
+      if (!parsedTree) {
+        // Build prompt for Gemini - ask for compact output
+        const prompt = `Du får en fil som innehåller en kategoristruktur eller produkthierarki.
+Analysera innehållet och konvertera det till ett JSON-träd med följande format:
+
+[{"id":"unikt-id","name":"Namn","text":"Beskrivning","children":[]}]
+
+Regler:
+- "id": unikt ID (använd befintlig kod/id om det finns, annars slugify namnet)
+- "name": kategorinamnet
+- "text": kort beskrivning för AI-kategorisering (kan vara tom sträng)
+- "children": array med underkategorier
+- Bevara hierarkin från originalfilen
+- VIKTIGT: Ge en kompakt JSON utan onödiga mellanslag
+
+${fileContent ? `Filinnehåll:\n${fileContent.slice(0, 10000)}` : 'Filen är bifogad som URL.'}
+
+Svara ENDAST med JSON-arrayen.`;
+
+        // Call Gemini to parse the file
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt,
+          file_urls: fileUrl ? [fileUrl] : [],
+          response_json_schema: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                text: { type: 'string' },
+                children: { type: 'array' }
+              },
+              required: ['id', 'name', 'children']
+            }
+          }
+        });
+
+        // Parse the response
+        try {
+          // Handle different response formats
+          const response = result.response || result;
+          if (typeof response === 'string') {
+            // Clean up the response - remove markdown code blocks if present
+            let cleanResponse = response.trim();
+            if (cleanResponse.startsWith('```json')) {
+              cleanResponse = cleanResponse.slice(7);
+            } else if (cleanResponse.startsWith('```')) {
+              cleanResponse = cleanResponse.slice(3);
+            }
+            if (cleanResponse.endsWith('```')) {
+              cleanResponse = cleanResponse.slice(0, -3);
+            }
+            parsedTree = JSON.parse(cleanResponse.trim());
+          } else if (Array.isArray(response)) {
+            parsedTree = response;
+          } else {
+            throw new Error('Oväntat svarsformat från AI');
+          }
+        } catch (parseErr) {
+          console.error('Failed to parse AI response:', parseErr, result);
+          throw new Error('Kunde inte tolka AI-svaret. Filen kan vara för stor eller ha ett okänt format.');
+        }
+      }
+
+      // Validate the tree structure
+      if (!Array.isArray(parsedTree)) {
+        throw new Error('Kunde inte skapa en giltig kategoristruktur');
+      }
+
+      // Merge with existing tree or replace
+      if (treeData.length > 0) {
+        const shouldReplace = confirm('Vill du ersätta befintligt träd? Klicka "Avbryt" för att lägga till kategorierna istället.');
+        if (shouldReplace) {
+          onChange(parsedTree);
+        } else {
+          onChange([...treeData, ...parsedTree]);
+        }
+      } else {
+        onChange(parsedTree);
+      }
+
+      // Expand all nodes to show the imported structure
+      const getAllIds = (nodes) => {
+        let ids = [];
+        for (const node of nodes) {
+          ids.push(node.id);
+          if (node.children && node.children.length > 0) {
+            ids = [...ids, ...getAllIds(node.children)];
+          }
+        }
+        return ids;
+      };
+      setExpandedNodes(new Set(getAllIds(parsedTree)));
+
+    } catch (err) {
+      console.error('File import failed:', err);
+      alert('Kunde inte importera fil: ' + err.message);
+    } finally {
+      setIsImporting(false);
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="border rounded-xl p-4 bg-muted/20">
       <div className="text-xs text-muted-foreground mb-3">
@@ -388,15 +571,44 @@ const TreeEditor = ({ treeData = [], onChange, onEditingChange }) => {
           Inga kategorier ännu
         </div>
       )}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={addRootNode}
-        className="w-full mt-4"
-      >
-        <Plus className="h-4 w-4 mr-2" />
-        Lägg till rotkategori
-      </Button>
+      <div className="flex gap-2 mt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addRootNode}
+          className="flex-1"
+          disabled={isImporting}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Lägg till rotkategori
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex-1"
+          disabled={isImporting}
+        >
+          {isImporting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Importerar...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4 mr-2" />
+              Importera från fil
+            </>
+          )}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.csv,.json,.xml,.md,.tsv,.xlsx,.xls,.pdf"
+          onChange={handleFileImport}
+          className="hidden"
+        />
+      </div>
     </div>
   );
 };
@@ -724,6 +936,9 @@ export default function Admin() {
                       <div className="w-40">
                         <Label className="text-xs text-muted-foreground">Typ</Label>
                       </div>
+                      <div className="w-12 text-center">
+                        <Label className="text-xs text-muted-foreground">AI</Label>
+                      </div>
                       <div className="w-9" /> {/* Spacer for delete button */}
                     </div>
                     {customFields.map((field) => (
@@ -746,9 +961,17 @@ export default function Admin() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="text">Textfält</SelectItem>
+                                <SelectItem value="select">Flerval</SelectItem>
                                 <SelectItem value="tree">Kategoriträd</SelectItem>
                               </SelectContent>
                             </Select>
+                          </div>
+                          <div className="w-12 h-10 flex items-center justify-center">
+                            <Checkbox
+                              checked={field.aiPopulated || false}
+                              onCheckedChange={(checked) => updateField(field.id, 'aiPopulated', checked)}
+                              title="AI-populerad vid generering"
+                            />
                           </div>
                           <Button
                             variant="ghost"
@@ -768,6 +991,55 @@ export default function Admin() {
                               onChange={(e) => updateField(field.id, 'prompt', e.target.value)}
                               className="text-sm text-muted-foreground"
                             />
+                          </div>
+                        )}
+                        {/* Options editor for select type */}
+                        {field.type === 'select' && (
+                          <div className="border rounded-lg p-3 bg-muted/20 space-y-2">
+                            <div className="text-xs text-muted-foreground mb-2">
+                              Lägg till de alternativ som ska kunna väljas i dropdown-menyn.
+                            </div>
+                            {(field.options || []).map((option, optIdx) => (
+                              <div key={optIdx} className="flex gap-2 items-center">
+                                <Input
+                                  placeholder="Alternativ..."
+                                  value={option.label || ''}
+                                  onChange={(e) => {
+                                    const newOptions = [...(field.options || [])];
+                                    newOptions[optIdx] = {
+                                      ...newOptions[optIdx],
+                                      label: e.target.value,
+                                      value: e.target.value.toLowerCase().replace(/\s+/g, '_')
+                                    };
+                                    updateField(field.id, 'options', newOptions);
+                                  }}
+                                  className="h-8 text-sm flex-1"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    const newOptions = (field.options || []).filter((_, i) => i !== optIdx);
+                                    updateField(field.id, 'options', newOptions);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newOptions = [...(field.options || []), { label: '', value: '' }];
+                                updateField(field.id, 'options', newOptions);
+                              }}
+                              className="w-full mt-2"
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-2" />
+                              Lägg till alternativ
+                            </Button>
                           </div>
                         )}
                         {/* Tree editor for category tree fields */}

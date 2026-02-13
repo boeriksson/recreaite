@@ -146,6 +146,7 @@ export default function Upload() {
   const [selectedGender, setSelectedGender] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedSeed, setSelectedSeed] = useState(null);
+  const [seedStepConfirmed, setSeedStepConfirmed] = useState(false);
   const [useSeedEnvironment, setUseSeedEnvironment] = useState(true);
   const [selectedEnvironment, setSelectedEnvironment] = useState('studio');
   const [customEnvironment, setCustomEnvironment] = useState('');
@@ -361,9 +362,15 @@ export default function Upload() {
     }
   }, [seeds]);
 
-  const { data: allGarments = [] } = useQuery({
-    queryKey: ['all-garments'],
-    queryFn: () => base44.entities.Garment.list('-created_date')
+  const { data: allGarments = [], isLoading: isLoadingGarments } = useQuery({
+    queryKey: ['all-garments', customer?.id],
+    queryFn: async () => {
+      const garments = await base44.entities.Garment.list();
+      // Sort by created date descending
+      return garments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+    enabled: !!customer?.id, // Only run when customer context is available
+    staleTime: 30000, // Cache for 30 seconds
   });
 
   const createGarmentMutation = useMutation({
@@ -1593,9 +1600,16 @@ Based on the garment image and the information above, determine which category t
               />
               
               {/* Select from existing garments */}
-              {allGarments.length > 0 && !uploadedUrl && (
+              {!uploadedUrl && (
                 <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
                   <h4 className="text-sm font-medium text-black dark:text-white mb-3">Eller välj från dina plagg</h4>
+                  {isLoadingGarments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-black/40 dark:text-white/40" />
+                    </div>
+                  ) : allGarments.length === 0 ? (
+                    <p className="text-sm text-black/50 dark:text-white/50 py-4">Inga plagg uppladdade än</p>
+                  ) : (
                   <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                     {allGarments.slice(0, 12).map((garment) => (
                       <button
@@ -1637,6 +1651,7 @@ Based on the garment image and the information above, determine which category t
                       </button>
                     ))}
                   </div>
+                  )}
                 </div>
               )}
             </AccordionSection>
@@ -1902,6 +1917,22 @@ Based on the garment image and the information above, determine which category t
                             placeholder="Välj kategori..."
                             className="mt-2"
                           />
+                        ) : field.type === 'select' && field.options?.length > 0 ? (
+                          <Select
+                            value={customFieldValues[field.id] || ''}
+                            onValueChange={(value) => setCustomFieldValues(prev => ({ ...prev, [field.id]: value }))}
+                          >
+                            <SelectTrigger className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white">
+                              <SelectValue placeholder="Välj..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {field.options.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <Input
                             value={customFieldValues[field.id] || ''}
@@ -1920,11 +1951,11 @@ Based on the garment image and the information above, determine which category t
 
           {/* Brand Seed Selection */}
           {mode !== 'style' && garmentData.name && (
-            <AccordionSection 
-              id="seed" 
-              title={selectedSeed ? `3. Varumärkesstil (Seed ${selectedSeed.name})` : "3. Varumärkesstil (Seed)"} 
-              isComplete={selectedSeed !== null} 
-              openSection={openSection} 
+            <AccordionSection
+              id="seed"
+              title={selectedSeed ? `3. Varumärkesstil (Seed ${selectedSeed.name})` : "3. Varumärkesstil (Seed)"}
+              isComplete={seedStepConfirmed}
+              openSection={openSection}
               setOpenSection={setOpenSection}
             >
               <div className="space-y-4">
@@ -1990,7 +2021,10 @@ Based on the garment image and the information above, determine which category t
                 </p>
 
                 <Button
-                  onClick={() => setOpenSectionWithScroll('model')}
+                  onClick={() => {
+                    setSeedStepConfirmed(true);
+                    setOpenSectionWithScroll('model');
+                  }}
                   variant="outline"
                   className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
                 >

@@ -138,7 +138,19 @@ export const CustomerProvider = ({ children }) => {
   }, []);
 
   // Create default customer (called when no customer exists)
+  // Includes a check to prevent race condition duplicates
   const createDefaultCustomer = useCallback(async () => {
+    // Double-check if default customer was created by another concurrent request
+    const existingCustomers = await base44.entities.Customer.filter(
+      { slug: 'default' },
+      { skipCustomerFilter: true }
+    );
+
+    if (existingCustomers.length > 0) {
+      console.log('Default customer already exists (race condition avoided):', existingCustomers[0].id);
+      return existingCustomers[0];
+    }
+
     console.log('Creating Default customer...');
     const newCustomer = await base44.entities.Customer.create({
       name: 'Default',

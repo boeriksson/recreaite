@@ -225,6 +225,15 @@ export const TreeSelector = ({
         className="w-[var(--radix-popover-trigger-width)] min-w-[280px] max-h-[300px] overflow-auto p-2"
         align="start"
       >
+        {/* Clear selection option */}
+        {value && (
+          <div
+            className="flex items-center gap-2 py-1.5 px-2 mb-1 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors border-b border-black/10 dark:border-white/10"
+            onClick={() => handleSelect('')}
+          >
+            <span className="text-sm text-black/60 dark:text-white/60 italic">Rensa val</span>
+          </div>
+        )}
         {treeData.length > 0 ? (
           treeData.map((node, idx) => (
             <TreeSelectorNode
