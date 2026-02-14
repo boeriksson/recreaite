@@ -174,12 +174,12 @@ För varje outfit, förklara kort varför plaggen passar ihop.`;
 
   // Auto-start analysis when section opens and garments are available
   useEffect(() => {
-    if (autoStart && !hasAutoStarted && initialSelectedGarments.length >= 2 && allGarments.length >= 2 && !analyzing && outfitSuggestions.length === 0) {
+    if (autoStart && !hasAutoStarted && allGarments.length >= 2 && !analyzing && outfitSuggestions.length === 0) {
       setHasAutoStarted(true);
       analyzeAndSuggest();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, initialSelectedGarments.length, allGarments.length]);
+  }, [autoStart, allGarments.length]);
 
   return (
     <div className="space-y-6">

@@ -1533,25 +1533,22 @@ Based on the garment image and the information above, determine which category t
                   uploading={uploading}
                   preview={null}
                   onClear={() => {}}
-                  selectionLabel="Välj minst 2 plagg att styla med"
+                  selectionLabel="Välj minst 2 plagg att styla med, eller klicka fortsätt och låt AI komponera"
                 />
-                
-                {selectedGarments.length >= 2 && (
-                  <div className="mt-6">
-                    <Button
-                      onClick={() => setOpenSectionWithScroll('ai-styling')}
-                      variant="outline"
-                      className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
-                    >
-                      Fortsätt
-                    </Button>
-                  </div>
-                )}
+
+                <div className="mt-6">
+                  <Button
+                    onClick={() => setOpenSectionWithScroll('ai-styling')}
+                    variant="outline"
+                    className="w-full border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+                  >
+                    Fortsätt
+                  </Button>
+                </div>
               </AccordionSection>
 
-              {/* AI Styling Suggestions - only show if garments are selected */}
-              {selectedGarments.length >= 2 && (
-                <AccordionSection
+              {/* AI Styling Suggestions */}
+              <AccordionSection
                   id="ai-styling"
                   title={`2. ${t.aiStyling || 'AI Styling'} (${selectedGarments.length} plagg)`}
                   isComplete={selectedGarments.length >= 2 && aiStylistSelected}
@@ -1577,7 +1574,6 @@ Based on the garment image and the information above, determine which category t
                     autoStart={openSection === 'ai-styling'}
                   />
                 </AccordionSection>
-              )}
 
             </>
           )}
