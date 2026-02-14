@@ -33,6 +33,7 @@ import { SignedImage } from "@/components/ui/SignedImage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -197,6 +198,11 @@ export default function Upload() {
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [selectedImageTypes, setSelectedImageTypes] = useState({
+    fullBody: true,
+    closeUp: true,
+    flatlay: true
+  });
   const [showInfo, setShowInfo] = useState(false);
   const [savedAnalysis, setSavedAnalysis] = useState(null);
   const [showBatchJobCreator, setShowBatchJobCreator] = useState(false);
@@ -222,6 +228,21 @@ export default function Upload() {
       setOpenSection('batch-garments');
     } else {
       setOpenSection('upload');
+    }
+
+    // Reset image type selections based on mode
+    if (mode === 'expert') {
+      setSelectedImageTypes({
+        fullBody: true,
+        closeUp: false,
+        flatlay: false
+      });
+    } else {
+      setSelectedImageTypes({
+        fullBody: true,
+        closeUp: true,
+        flatlay: true
+      });
     }
   }, [mode]);
 
@@ -339,8 +360,9 @@ export default function Upload() {
   }, []);
 
   const { data: models = [] } = useQuery({
-    queryKey: ['models'],
-    queryFn: () => base44.entities.Model.list()
+    queryKey: ['models', customer?.id],
+    queryFn: () => base44.entities.Model.list(),
+    enabled: !!customer?.id
   });
 
   // Auto-select first model on load
@@ -900,8 +922,7 @@ Based on the garment image and the information above, determine which category t
 
       // Determine outfit completion instruction based on garment category
       let outfitInstruction = '';
-      let modelInstruction = '';
-      
+
       if (mode !== 'style') {
         const category = garmentData.category;
         // Determine appropriate bottoms based on selected model gender
@@ -918,11 +939,6 @@ Based on the garment image and the information above, determine which category t
           outfitInstruction = ' wearing the accessory in the reference image, paired with a complete stylish outfit that complements it. CRITICAL: FULL BODY SHOT showing the ENTIRE model from HEAD to TOES. Show complete body including head, torso, arms, legs, and feet. DO NOT crop at any point. The entire person must be visible in frame from top of head to bottom of feet. ';
         } else {
           outfitInstruction = ' wearing the garment in the reference image, paired with complementary clothing to create a complete stylish outfit. CRITICAL: FULL BODY SHOT showing the ENTIRE model from HEAD to TOES. Show complete body including head, torso, arms, legs, and feet. DO NOT crop at any point. The entire person must be visible in frame from top of head to bottom of feet. ';
-        }
-        
-        // Add model instruction when a specific model is selected
-        if (selectedModel) {
-          modelInstruction = ' CRITICAL: The model must have the EXACT SAME FACE and HAIR as shown in the first reference image - identical facial features, same eye shape and color, same nose, same mouth, same hair color, same hair style. The face and hair must match perfectly. Important: Do NOT copy any clothing from the model reference image - only use the face and hair. The garment comes from the separate garment reference. ';
         }
       }
 
@@ -998,24 +1014,28 @@ Based on the garment image and the information above, determine which category t
         prompt = customPrompt || `Professional fashion model wearing the garment in the reference image. High-quality product photography, professional studio lighting. ${STUDIO_PROMPT} ABSOLUTE CRITICAL GARMENT RULE: The garment from the reference image must be reproduced with PERFECT ACCURACY - exact same color, exact same texture, exact same patterns, exact same details. DO NOT add, modify, or invent ANY features not visible in the reference.`;
       }
 
-      // Always generate a cropped version for single garment modes
-      const shouldGenerateCrop = mode !== 'style';
-      
-      // Create placeholder records immediately
-      console.log('Creating full-body image record...');
-      const newImage = await createGeneratedImageMutation.mutateAsync({
-        garment_id: garmentId,
-        garment_urls: mode === 'style' ? selectedGarments.map(g => g.image_url) : undefined,
-        model_type: selectedModel?.id || 'default',
-        image_url: '',
-        prompt_used: prompt,
-        status: 'processing',
-        ai_analysis: aiSuggestions && !aiSuggestions.error ? aiSuggestions : undefined
-      });
-      console.log('Full-body image record created:', newImage.id);
-
+      // Create placeholder records based on selected image types
+      let newImage = null;
       let croppedImage = null;
-      if (shouldGenerateCrop) {
+      let layFlatImage = null;
+
+      // Create full-body image record if selected
+      if (selectedImageTypes.fullBody) {
+        console.log('Creating full-body image record...');
+        newImage = await createGeneratedImageMutation.mutateAsync({
+          garment_id: garmentId,
+          garment_urls: mode === 'style' ? selectedGarments.map(g => g.image_url) : undefined,
+          model_type: selectedModel?.id || 'default',
+          image_url: '',
+          prompt_used: prompt,
+          status: 'processing',
+          ai_analysis: aiSuggestions && !aiSuggestions.error ? aiSuggestions : undefined
+        });
+        console.log('Full-body image record created:', newImage.id);
+      }
+
+      // Create cropped/close-up image record if selected
+      if (selectedImageTypes.closeUp) {
         console.log('Creating cropped image record...');
         croppedImage = await createGeneratedImageMutation.mutateAsync({
           garment_id: garmentId,
@@ -1029,9 +1049,8 @@ Based on the garment image and the information above, determine which category t
         console.log('Cropped image record created:', croppedImage.id);
       }
 
-      // Create lay-flat image record
-      let layFlatImage = null;
-      if (shouldGenerateCrop) {
+      // Create lay-flat image record if selected
+      if (selectedImageTypes.flatlay) {
         console.log('Creating lay-flat image record...');
         layFlatImage = await createGeneratedImageMutation.mutateAsync({
           garment_id: garmentId,
@@ -1074,53 +1093,74 @@ Based on the garment image and the information above, determine which category t
           console.log('First image URL (should be model):', signedImageUrls[0]?.substring(0, 100));
 
           const generateWithTimeout = async () => {
-            const result = await base44.integrations.Core.GenerateImage({
-              prompt: `${prompt} 4:5 aspect ratio, portrait orientation.`,
-              existing_image_urls: signedImageUrls
-            });
+            let fullBodyUrl = null;
 
-            console.log('Updating full-body image record:', newImage.id);
-            await base44.entities.GeneratedImage.update(newImage.id, {
-              image_url: result.url,
-              status: 'completed'
-            });
-            console.log('Full-body image record updated successfully');
+            // Generate full-body image if selected
+            if (newImage) {
+              const result = await base44.integrations.Core.GenerateImage({
+                prompt: `${prompt} 4:5 aspect ratio, portrait orientation.`,
+                existing_image_urls: signedImageUrls
+              });
+
+              fullBodyUrl = result.url;
+              console.log('Updating full-body image record:', newImage.id);
+              await base44.entities.GeneratedImage.update(newImage.id, {
+                image_url: result.url,
+                status: 'completed'
+              });
+              console.log('Full-body image record updated successfully');
+            }
 
             if (croppedImage) {
               const category = garmentData.category;
-              
+
               let croppedPrompt = '';
               let referenceImages = [];
-              
-              // Use only the generated full-body image as reference (2 images causes IMAGE_OTHER errors from Gemini)
+
+              // Use full-body image if available, otherwise use original garment image
+              const referenceUrl = fullBodyUrl || (await getSignedUrl(uploadedUrl));
+              const hasFullBody = !!fullBodyUrl;
+
               if (category === 'tops' || category === 'outerwear') {
-                croppedPrompt = 'Professional product photography closeup shot. Model wearing the top/jacket from reference, framed from waist/mid-torso up to head. Upper body garment is main focus filling frame. Show fabric texture, details, neckline, sleeves, fit on upper body. Model face and shoulders visible. Same lighting and background as reference.';
-                referenceImages = [result.url];
+                croppedPrompt = hasFullBody
+                  ? 'Professional product photography closeup shot. Model wearing the top/jacket from reference, framed from waist/mid-torso up to head. Upper body garment is main focus filling frame. Show fabric texture, details, neckline, sleeves, fit on upper body. Model face and shoulders visible. Same lighting and background as reference.'
+                  : 'Professional product photography closeup shot. Fashion model wearing the garment from reference image, framed from waist/mid-torso up to head. Upper body garment is main focus filling frame. Show fabric texture, details, neckline, sleeves, fit on upper body. Professional studio lighting.';
+                referenceImages = [referenceUrl];
               } else if (category === 'bottoms') {
-                croppedPrompt = 'Professional product photography closeup shot. Model wearing the pants/shorts/skirt from reference, framed from knees/mid-thigh up to chest. Lower body garment is main focus filling frame. Show fabric texture, waistband, fit on legs and hips. Model legs and torso visible, no face. Same lighting and background as reference.';
-                referenceImages = [result.url];
+                croppedPrompt = hasFullBody
+                  ? 'Professional product photography closeup shot. Model wearing the pants/shorts/skirt from reference, framed from knees/mid-thigh up to chest. Lower body garment is main focus filling frame. Show fabric texture, waistband, fit on legs and hips. Model legs and torso visible, no face. Same lighting and background as reference.'
+                  : 'Professional product photography closeup shot. Fashion model wearing the pants/shorts/skirt from reference image, framed from knees/mid-thigh up to chest. Lower body garment is main focus filling frame. Show fabric texture, waistband, fit on legs and hips. Professional studio lighting.';
+                referenceImages = [referenceUrl];
               } else if (category === 'dresses') {
-                croppedPrompt = 'Professional product photography closeup shot. Model wearing the dress from reference, framed from mid-thigh up to head. Dress is main focus filling frame. Show fabric texture, neckline, bodice, fit details. Model visible wearing dress. Same lighting and background as reference.';
-                referenceImages = [result.url];
+                croppedPrompt = hasFullBody
+                  ? 'Professional product photography closeup shot. Model wearing the dress from reference, framed from mid-thigh up to head. Dress is main focus filling frame. Show fabric texture, neckline, bodice, fit details. Model visible wearing dress. Same lighting and background as reference.'
+                  : 'Professional product photography closeup shot. Fashion model wearing the dress from reference image, framed from mid-thigh up to head. Dress is main focus filling frame. Show fabric texture, neckline, bodice, fit details. Professional studio lighting.';
+                referenceImages = [referenceUrl];
               } else if (category === 'accessories') {
                 const name = garmentData.name.toLowerCase();
                 if (name.includes('sko') || name.includes('shoe') || name.includes('sneaker') || name.includes('boot')) {
-                  croppedPrompt = 'Professional product photography EXTREME CLOSEUP of shoes/footwear. Frame shows ONLY model feet wearing the shoes from reference, with lower legs visible from ankles to maximum knees. Shoes are THE PRIMARY SUBJECT filling 70% of frame. Show shoe material, laces, soles, logo, texture, how they fit on feet. Background: floor/ground visible. DO NOT show torso, waist, upper body, or face - frame stops at knees maximum. This is a FEET AND SHOES CLOSEUP ONLY.';
-                  referenceImages = [result.url];
+                  croppedPrompt = hasFullBody
+                    ? 'Professional product photography EXTREME CLOSEUP of shoes/footwear. Frame shows ONLY model feet wearing the shoes from reference, with lower legs visible from ankles to maximum knees. Shoes are THE PRIMARY SUBJECT filling 70% of frame. Show shoe material, laces, soles, logo, texture, how they fit on feet. Background: floor/ground visible. DO NOT show torso, waist, upper body, or face - frame stops at knees maximum. This is a FEET AND SHOES CLOSEUP ONLY.'
+                    : 'Professional product photography EXTREME CLOSEUP of shoes/footwear on model feet. Show shoe material, laces, soles, logo, texture, how they fit on feet. Shoes are THE PRIMARY SUBJECT. Professional studio lighting.';
+                  referenceImages = [referenceUrl];
                 } else if (name.includes('väska') || name.includes('bag')) {
-                  croppedPrompt = 'Professional product photography closeup shot. Model holding/wearing the bag from reference. Bag is main focus filling frame with hands and partial torso visible. Show bag texture, hardware, straps, details. Same lighting and background as reference.';
-                  referenceImages = [result.url];
+                  croppedPrompt = hasFullBody
+                    ? 'Professional product photography closeup shot. Model holding/wearing the bag from reference. Bag is main focus filling frame with hands and partial torso visible. Show bag texture, hardware, straps, details. Same lighting and background as reference.'
+                    : 'Professional product photography closeup shot. Model holding the bag from reference image. Bag is main focus filling frame. Show bag texture, hardware, straps, details. Professional studio lighting.';
+                  referenceImages = [referenceUrl];
                 } else {
-                  croppedPrompt = 'Professional product photography closeup shot. Model wearing the accessory from reference. Accessory is main focus filling significant portion of frame. Show accessory details, texture, materials. Model partially visible as needed. Same lighting and background as reference.';
-                  // Use only the generated full-body image as reference (2 images causes IMAGE_OTHER errors)
-                  referenceImages = [result.url];
+                  croppedPrompt = hasFullBody
+                    ? 'Professional product photography closeup shot. Model wearing the accessory from reference. Accessory is main focus filling significant portion of frame. Show accessory details, texture, materials. Model partially visible as needed. Same lighting and background as reference.'
+                    : 'Professional product photography closeup shot. Model wearing the accessory from reference image. Accessory is main focus filling frame. Show accessory details, texture, materials. Professional studio lighting.';
+                  referenceImages = [referenceUrl];
                 }
               } else {
-                croppedPrompt = 'Professional product photography closeup shot. Model wearing the garment from reference. Garment is main focus filling frame. Show fabric texture, details, fit clearly. Same lighting and background as reference.';
-                // Use only the generated full-body image as reference (2 images causes IMAGE_OTHER errors)
-                referenceImages = [result.url];
+                croppedPrompt = hasFullBody
+                  ? 'Professional product photography closeup shot. Model wearing the garment from reference. Garment is main focus filling frame. Show fabric texture, details, fit clearly. Same lighting and background as reference.'
+                  : 'Professional product photography closeup shot. Fashion model wearing the garment from reference image. Garment is main focus filling frame. Show fabric texture, details, fit clearly. Professional studio lighting.';
+                referenceImages = [referenceUrl];
               }
-              
+
               const croppedResult = await base44.integrations.Core.GenerateImage({
                 prompt: `${croppedPrompt} MANDATORY: 4:5 aspect ratio portrait orientation. Professional studio lighting matching reference. High quality product detail photography.`,
                 existing_image_urls: referenceImages
@@ -1163,14 +1203,16 @@ Based on the garment image and the information above, determine which category t
           console.error('🔴 Background generation failed:', errorMsg, error);
           console.error('🔴 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
 
-          // Always update status to failed with error message
-          try {
-            await base44.entities.GeneratedImage.update(newImage.id, {
-              status: 'failed',
-              prompt_used: `ERROR: ${errorMsg}\n\nOriginal prompt: ${newImage.prompt_used || prompt}`
-            });
-          } catch (updateError) {
-            console.error('Failed to update main image status:', updateError);
+          // Update status to failed with error message for all created records
+          if (newImage) {
+            try {
+              await base44.entities.GeneratedImage.update(newImage.id, {
+                status: 'failed',
+                prompt_used: `ERROR: ${errorMsg}\n\nOriginal prompt: ${newImage.prompt_used || prompt}`
+              });
+            } catch (updateError) {
+              console.error('Failed to update main image status:', updateError);
+            }
           }
 
           if (croppedImage) {
@@ -1533,7 +1575,7 @@ Based on the garment image and the information above, determine which category t
                   uploading={uploading}
                   preview={null}
                   onClear={() => {}}
-                  selectionLabel="Välj minst 2 plagg att styla med, eller klicka fortsätt och låt AI komponera"
+                  selectionLabel="Välj minst 1 plagg att styla med, eller klicka fortsätt och låt AI komponera"
                 />
 
                 <div className="mt-6">
@@ -1862,18 +1904,22 @@ Based on the garment image and the information above, determine which category t
                 
                 <div>
                   <Label className="text-black/80 dark:text-white/80">Kategori</Label>
-                  <select
-                    value={garmentData.category}
-                    onChange={(e) => setGarmentData({ ...garmentData, category: e.target.value })}
-                    className="w-full mt-2 px-3 py-2 rounded-lg bg-[#f5f5f7] border border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white"
+                  <Select
+                    value={garmentData.category || 'none'}
+                    onValueChange={(value) => setGarmentData({ ...garmentData, category: value === 'none' ? '' : value })}
                   >
-                    <option value="">Välj kategori</option>
-                    <option value="tops">Överdel</option>
-                    <option value="bottoms">Underdel</option>
-                    <option value="dresses">Klänningar</option>
-                    <option value="outerwear">Ytterkläder</option>
-                    <option value="accessories">Accessoarer</option>
-                  </select>
+                    <SelectTrigger className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white">
+                      <SelectValue placeholder="Välj kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Välj kategori</SelectItem>
+                      <SelectItem value="tops">Överdel</SelectItem>
+                      <SelectItem value="bottoms">Underdel</SelectItem>
+                      <SelectItem value="dresses">Klänningar</SelectItem>
+                      <SelectItem value="outerwear">Ytterkläder</SelectItem>
+                      <SelectItem value="accessories">Accessoarer</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div>
@@ -1969,21 +2015,25 @@ Based on the garment image and the information above, determine which category t
 
                 <div>
                   <Label className="text-black/80 dark:text-white/80">Välj varumärkesstil</Label>
-                  <select
-                    value={selectedSeed?.id || ''}
-                    onChange={(e) => {
-                      const seed = seeds.find(s => s.id === e.target.value);
+                  <Select
+                    value={selectedSeed?.id || 'none'}
+                    onValueChange={(value) => {
+                      const seed = value === 'none' ? null : seeds.find(s => s.id === value);
                       setSelectedSeed(seed || null);
                     }}
-                    className="w-full mt-2 px-3 py-2 rounded-lg bg-[#f5f5f7] border border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white"
                   >
-                    <option value="">Ingen (standard)</option>
-                    {seeds.map((seed) => (
-                      <option key={seed.id} value={seed.id}>
-                        {seed.name} ({seed.domain})
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="mt-2 bg-[#f5f5f7] border-black/10 text-black dark:bg-white/5 dark:border-white/10 dark:text-white">
+                      <SelectValue placeholder="Ingen (standard)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Ingen (standard)</SelectItem>
+                      {seeds.map((seed) => (
+                        <SelectItem key={seed.id} value={seed.id}>
+                          {seed.name} ({seed.domain})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {selectedSeed && (
@@ -2240,8 +2290,66 @@ Based on the garment image and the information above, determine which category t
             </AccordionSection>
           )}
 
+          {/* Image Type Selection - not shown for batch mode (batch always generates full body only) */}
+          {canGenerate && mode !== 'batch' && (
+            <AccordionSection
+              id="image-types"
+              title={`${mode === 'style' ? '6' : mode === 'expert' ? '5' : '6'}. Välj bildresultat`}
+              isComplete={selectedImageTypes.fullBody || selectedImageTypes.closeUp || selectedImageTypes.flatlay}
+              openSection={openSection}
+              setOpenSection={setOpenSection}
+            >
+              <div className="space-y-4">
+                <p className="text-sm text-black/60 dark:text-white/60">
+                  Välj vilka bildtyper som ska genereras
+                </p>
+
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[#f5f5f7] dark:bg-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <Checkbox
+                      checked={selectedImageTypes.fullBody}
+                      onCheckedChange={(checked) => setSelectedImageTypes(prev => ({ ...prev, fullBody: !!checked }))}
+                    />
+                    <div>
+                      <p className="font-medium text-black dark:text-white">Helkropp</p>
+                      <p className="text-sm text-black/50 dark:text-white/50">Helbild av modell med plagget</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[#f5f5f7] dark:bg-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <Checkbox
+                      checked={selectedImageTypes.closeUp}
+                      onCheckedChange={(checked) => setSelectedImageTypes(prev => ({ ...prev, closeUp: !!checked }))}
+                    />
+                    <div>
+                      <p className="font-medium text-black dark:text-white">Närbild</p>
+                      <p className="text-sm text-black/50 dark:text-white/50">Fokuserad bild på plaggets detaljer</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[#f5f5f7] dark:bg-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <Checkbox
+                      checked={selectedImageTypes.flatlay}
+                      onCheckedChange={(checked) => setSelectedImageTypes(prev => ({ ...prev, flatlay: !!checked }))}
+                    />
+                    <div>
+                      <p className="font-medium text-black dark:text-white">Flatlay</p>
+                      <p className="text-sm text-black/50 dark:text-white/50">Plagget liggande på plan yta</p>
+                    </div>
+                  </label>
+                </div>
+
+                {!selectedImageTypes.fullBody && !selectedImageTypes.closeUp && !selectedImageTypes.flatlay && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    Välj minst en bildtyp för att kunna generera
+                  </p>
+                )}
+              </div>
+            </AccordionSection>
+          )}
+
           {/* Action Buttons */}
-          {canGenerate && (
+          {canGenerate && (mode === 'batch' || selectedImageTypes.fullBody || selectedImageTypes.closeUp || selectedImageTypes.flatlay) && (
             <div className="space-y-3">
               <Button
                 onClick={mode === 'batch' ? handleBatchGenerate : handleGenerate}

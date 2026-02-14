@@ -1,33 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/amplifyClient';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shirt,
   Search,
   Plus,
   Trash2,
-  Sparkles,
-  MoreVertical,
   Info,
   Loader2,
   RefreshCw,
-  X
+  X,
+  ZoomIn,
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { SignedImage } from "@/components/ui/SignedImage";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -75,6 +69,20 @@ export default function Garments() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedGarment, setEditedGarment] = useState(null);
   const [regeneratingFlatlay, setRegeneratingFlatlay] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [fullScale, setFullScale] = useState(false);
+
+  // Prevent body scroll when lightbox is open
+  useEffect(() => {
+    if (selectedImage) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedImage]);
 
   const { data: garments = [], isLoading } = useQuery({
     queryKey: ['garments'],
@@ -211,7 +219,10 @@ export default function Garments() {
               transition={{ delay: index * 0.05 }}
               className="group relative"
             >
-              <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-white/20 transition-all">
+              <div
+                className="aspect-[3/4] rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                onClick={() => setSelectedImage(garment)}
+              >
                 {garment.image_url ? (
                   <SignedImage
                     src={garment.image_url}
@@ -223,68 +234,47 @@ export default function Garments() {
                     <Shirt className="h-12 w-12 text-white/20" />
                   </div>
                 )}
-                
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                
-                {/* Actions */}
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleOpenInfo(garment)}>
-                        <Info className="h-4 w-4 mr-2" />
-                        {t.information}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to={`${createPageUrl('Upload')}?garment=${garment.id}`} className="flex items-center">
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          {t.generateImage}
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setDeleteId(garment.id)}
-                        className="text-red-500 focus:text-red-500"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {t.delete}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                
-                {/* Quick generate button */}
-                <Link
-                  to={`${createPageUrl('Upload')}?garment=${garment.id}`}
-                  className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
+
+                {/* Info Button - Left */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenInfo(garment);
+                  }}
+                  className="absolute top-3 left-3 z-10 h-8 w-8 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
                 >
-                  <Button className="w-full bg-[#392599] hover:bg-[#4a2fb3] text-white font-medium rounded-full text-sm">
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {t.generate}
-                  </Button>
-                </Link>
-              </div>
-              
-              {/* Info */}
-              <div className="mt-3 px-1">
-                <h3 className="text-black dark:text-white font-medium truncate">{garment.name}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  {garment.category && (
-                    <Badge variant="secondary" className="bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60 text-xs">
-                      {categoryLabels[garment.category] || garment.category}
-                    </Badge>
-                  )}
-                  {garment.brand && (
-                    <span className="text-sm text-black/40 dark:text-white/40">{garment.brand}</span>
-                  )}
+                  <Info className="h-4 w-4 text-white" />
+                </button>
+
+                {/* Delete Button - Center */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteId(garment.id);
+                  }}
+                  className="absolute top-3 left-1/2 -translate-x-1/2 z-10 h-8 w-8 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="h-4 w-4 text-white" />
+                </button>
+
+                {/* Zoom indicator - Right */}
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="h-8 w-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                    <ZoomIn className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+
+                {/* Hover Overlay with Info */}
+                <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#392599] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-b-2xl flex flex-col justify-end p-4">
+                  <h3 className="text-white font-medium truncate">
+                    {garment.name || t.unknownGarment}
+                  </h3>
+                  <div className="flex items-center gap-1 text-xs text-white/80 mt-1">
+                    <Calendar className="h-3 w-3" />
+                    {garment.createdAt
+                      ? format(new Date(garment.createdAt), 'd MMMM yyyy', { locale: language === 'sv' ? sv : enUS })
+                      : '-'}
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -317,7 +307,7 @@ export default function Garments() {
 
       {/* Information Dialog */}
       <Dialog open={!!infoGarment} onOpenChange={() => { setInfoGarment(null); setIsEditing(false); }}>
-        <DialogContent className="bg-[#1A1A1A] border-white/10 text-white max-w-2xl">
+        <DialogContent className="bg-[#1A1A1A] border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">{t.garmentInformationTitle}</DialogTitle>
             {!isEditing && infoGarment?.createdAt && (
@@ -497,6 +487,99 @@ export default function Garments() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black overflow-y-auto overscroll-contain"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setSelectedImage(null);
+                setFullScale(false);
+              }
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImage(null);
+                setFullScale(false);
+              }}
+              className="fixed top-4 sm:top-6 right-4 sm:right-6 z-20 p-3 bg-white/90 hover:bg-white rounded-lg transition-colors shadow-lg"
+            >
+              <X className="h-6 w-6 text-black" />
+            </button>
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="min-h-screen flex flex-col pt-20 pb-32 sm:pb-24"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="flex-1 flex justify-center items-start sm:items-center px-4"
+                onClick={() => setFullScale(!fullScale)}
+              >
+                <SignedImage
+                  src={selectedImage.image_url}
+                  alt={selectedImage.name}
+                  className={`${fullScale ? 'cursor-zoom-out w-full' : 'max-w-full max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-200px)] object-contain cursor-zoom-in'}`}
+                />
+              </div>
+
+              <div className="fixed bottom-0 left-0 right-0 flex flex-col gap-3 p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
+                {/* Garment Info */}
+                <div className="text-center">
+                  <h3 className="text-white font-medium text-lg">{selectedImage.name}</h3>
+                  {selectedImage.brand && (
+                    <p className="text-white/60 text-sm">{selectedImage.brand}</p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+                  <Link to={`${createPageUrl('Upload')}?garment=${selectedImage.id}`}>
+                    <Button className="bg-[#392599] hover:bg-[#4a2fb3] text-white font-medium rounded-full w-full sm:w-auto">
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {t.generateImage}
+                    </Button>
+                  </Link>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenInfo(selectedImage);
+                      setSelectedImage(null);
+                      setFullScale(false);
+                    }}
+                    className="bg-black hover:bg-black/80 border border-white/20 text-white font-medium rounded-full w-full sm:w-auto"
+                  >
+                    <Info className="h-4 w-4 mr-2" />
+                    {t.information}
+                  </Button>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteId(selectedImage.id);
+                      setSelectedImage(null);
+                      setFullScale(false);
+                    }}
+                    variant="outline"
+                    className="border-red-600 text-white bg-red-600 hover:bg-red-700 rounded-full w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {t.delete}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
