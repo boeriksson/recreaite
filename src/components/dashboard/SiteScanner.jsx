@@ -4,15 +4,17 @@ import { base44 } from '@/api/amplifyClient';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Sparkles, 
-  Search, 
-  Loader2, 
+import {
+  Sparkles,
+  Search,
+  Loader2,
   CheckCircle2,
   Image as ImageIcon,
   Globe,
   Trash2,
-  Save
+  Save,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +39,7 @@ export default function SiteScanner() {
   const [deleteId, setDeleteId] = useState(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedSeeds, setSelectedSeeds] = useState([]);
+  const [expandedSeedId, setExpandedSeedId] = useState(null);
 
   const { data: seeds = [], isLoading: seedsLoading } = useQuery({
     queryKey: ['brand-seeds'],
@@ -318,37 +321,176 @@ Be specific, professional, and actionable in your analysis.`,
           </div>
           <div className="space-y-3">
             {seeds.map((seed) => (
-              <div
-                key={seed.id}
-                onClick={() => compareMode && toggleSeedSelection(seed.id)}
-                className={cn(
-                  "flex items-center justify-between p-4 bg-white dark:bg-white/10 rounded-xl border transition-all",
-                  compareMode 
-                    ? selectedSeeds.includes(seed.id)
-                      ? "border-[#392599] bg-[#392599]/5 cursor-pointer"
-                      : "border-black/10 dark:border-white/10 hover:border-[#392599]/50 cursor-pointer"
-                    : "border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20"
-                )}
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h4 className="text-black dark:text-white font-medium">{seed.name}</h4>
-                    <span className="px-2 py-0.5 bg-[#392599]/20 text-[#392599] text-xs rounded-full capitalize">
-                      {seed.character}
-                    </span>
+              <div key={seed.id} className="space-y-0">
+                <div
+                  onClick={() => {
+                    if (compareMode) {
+                      toggleSeedSelection(seed.id);
+                    } else {
+                      setExpandedSeedId(expandedSeedId === seed.id ? null : seed.id);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center justify-between p-4 bg-white dark:bg-white/10 border transition-all cursor-pointer",
+                    expandedSeedId === seed.id ? "rounded-t-xl" : "rounded-xl",
+                    compareMode
+                      ? selectedSeeds.includes(seed.id)
+                        ? "border-[#392599] bg-[#392599]/5"
+                        : "border-black/10 dark:border-white/10 hover:border-[#392599]/50"
+                      : expandedSeedId === seed.id
+                        ? "border-[#392599] border-b-0"
+                        : "border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20"
+                  )}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h4 className="text-black dark:text-white font-medium">{seed.name}</h4>
+                      <span className="px-2 py-0.5 bg-[#392599]/20 text-[#392599] text-xs rounded-full capitalize">
+                        {seed.character}
+                      </span>
+                    </div>
+                    <p className="text-sm text-black/60 dark:text-white/60">{seed.domain}</p>
                   </div>
-                  <p className="text-sm text-black/60 dark:text-white/60">{seed.domain}</p>
+                  <div className="flex items-center gap-2">
+                    {!compareMode && (
+                      <>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(seed.id);
+                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="text-black/40 dark:text-white/40 hover:text-red-400 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        {expandedSeedId === seed.id ? (
+                          <ChevronUp className="h-5 w-5 text-black/40 dark:text-white/40" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-black/40 dark:text-white/40" />
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                {!compareMode && (
-                  <Button
-                    onClick={() => setDeleteId(seed.id)}
-                    variant="ghost"
-                    size="icon"
-                    className="text-black/40 dark:text-white/40 hover:text-red-400 hover:bg-red-500/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+
+                {/* Expanded Seed Details */}
+                <AnimatePresence>
+                  {expandedSeedId === seed.id && !compareMode && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-4 bg-white dark:bg-white/10 border border-[#392599] border-t-0 rounded-b-xl space-y-4">
+                        {/* Overall Style Summary */}
+                        {seed.overall_style_summary && (
+                          <div className="p-3 bg-gradient-to-br from-[#392599]/5 to-[#0071e3]/5 border border-[#392599]/20 rounded-lg">
+                            <p className="text-xs text-[#392599] uppercase tracking-wide mb-1 font-medium">Övergripande stil</p>
+                            <p className="text-black dark:text-white text-sm leading-relaxed">{seed.overall_style_summary}</p>
+                          </div>
+                        )}
+
+                        {/* Brand Style */}
+                        {seed.brand_style && (
+                          <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                            <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Varumärkesstil</p>
+                            <p className="text-black dark:text-white text-sm leading-relaxed">{seed.brand_style}</p>
+                          </div>
+                        )}
+
+                        {/* Core Info Grid */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                            <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Karaktär</p>
+                            <p className="text-black dark:text-white text-sm font-medium capitalize">{seed.character}</p>
+                          </div>
+                          <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                            <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Miljö</p>
+                            <p className="text-black dark:text-white text-sm font-medium capitalize">{seed.environment?.replace(/_/g, ' ')}</p>
+                          </div>
+                          <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                            <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Modelltyp</p>
+                            <p className="text-black dark:text-white text-sm font-medium capitalize">{seed.typical_gender}</p>
+                          </div>
+                        </div>
+
+                        {/* Typography & Image Style */}
+                        {(seed.typography || seed.image_style) && (
+                          <div className="grid md:grid-cols-2 gap-3">
+                            {seed.typography && (
+                              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/30 rounded-lg">
+                                <p className="text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wide mb-1 font-medium">Typografi</p>
+                                <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed">{seed.typography}</p>
+                              </div>
+                            )}
+                            {seed.image_style && (
+                              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/30 rounded-lg">
+                                <p className="text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-1 font-medium">Bildstil</p>
+                                <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed">{seed.image_style}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Color Palette & Photography Style */}
+                        {(seed.color_palette || seed.photography_style) && (
+                          <div className="grid md:grid-cols-2 gap-3">
+                            {seed.color_palette && (
+                              <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                                <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Färgpalett</p>
+                                <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed">{seed.color_palette}</p>
+                              </div>
+                            )}
+                            {seed.photography_style && (
+                              <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                                <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Fotostil</p>
+                                <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed">{seed.photography_style}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Visual Analysis */}
+                        {seed.visual_analysis && (
+                          <div className="p-3 bg-[#f5f5f7] dark:bg-white/5 rounded-lg">
+                            <p className="text-xs text-black/40 dark:text-white/40 uppercase tracking-wide mb-1">Visuell analys</p>
+                            <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed whitespace-pre-line">{seed.visual_analysis}</p>
+                          </div>
+                        )}
+
+                        {/* Recommendations */}
+                        {seed.recommendations && (
+                          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 rounded-lg">
+                            <p className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide mb-1 font-medium">Rekommendationer</p>
+                            <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed whitespace-pre-line">{seed.recommendations}</p>
+                          </div>
+                        )}
+
+                        {/* Strengths & Weaknesses */}
+                        {(seed.strengths || seed.weaknesses) && (
+                          <div className="grid md:grid-cols-2 gap-3">
+                            {seed.strengths && (
+                              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/30 rounded-lg">
+                                <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1 font-medium">Styrkor</p>
+                                <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed whitespace-pre-line">{seed.strengths}</p>
+                              </div>
+                            )}
+                            {seed.weaknesses && (
+                              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/30 rounded-lg">
+                                <p className="text-xs text-orange-600 dark:text-orange-400 uppercase tracking-wide mb-1 font-medium">Förbättringsområden</p>
+                                <p className="text-black/80 dark:text-white/80 text-sm leading-relaxed whitespace-pre-line">{seed.weaknesses}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ))}
           </div>

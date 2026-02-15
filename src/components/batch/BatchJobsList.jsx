@@ -155,6 +155,7 @@ export default function BatchJobsList({ hideHeader = false, showEmptyStateAtBott
 
           await base44.entities.GeneratedImage.create({
             garment_id: garmentId,
+            garment_urls: garment.image_url ? [garment.image_url] : undefined,
             model_type: configuration.model_id || 'default',
             image_url: result.url,
             prompt_used: prompt,
@@ -265,6 +266,7 @@ export default function BatchJobsList({ hideHeader = false, showEmptyStateAtBott
 
           await base44.entities.GeneratedImage.create({
             garment_id: garmentId,
+            garment_urls: garment.image_url ? [garment.image_url] : undefined,
             model_type: configuration.model_id || 'default',
             image_url: result.url,
             prompt_used: prompt,

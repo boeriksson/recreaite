@@ -808,6 +808,7 @@ Based on the garment image and the information above, determine which category t
           console.warn(`Generation blocked for ${garment.name}:`, result.errorMessage);
           await createGeneratedImageMutation.mutateAsync({
             garment_id: garment.id,
+            garment_urls: garment.image_url ? [garment.image_url] : undefined,
             model_type: selectedModel?.id || 'default',
             image_url: '',
             prompt_used: prompt,
@@ -817,6 +818,7 @@ Based on the garment image and the information above, determine which category t
         } else {
           await createGeneratedImageMutation.mutateAsync({
             garment_id: garment.id,
+            garment_urls: garment.image_url ? [garment.image_url] : undefined,
             model_type: selectedModel?.id || 'default',
             image_url: result.url,
             prompt_used: prompt,
@@ -829,6 +831,7 @@ Based on the garment image and the information above, determine which category t
         try {
           await createGeneratedImageMutation.mutateAsync({
             garment_id: garment.id,
+            garment_urls: garment.image_url ? [garment.image_url] : undefined,
             model_type: selectedModel?.id || 'default',
             image_url: '',
             prompt_used: prompt || '',
@@ -1019,12 +1022,19 @@ Based on the garment image and the information above, determine which category t
       let croppedImage = null;
       let layFlatImage = null;
 
+      // Always store garment URLs for reference during editing
+      // For style mode: all selected garment URLs
+      // For other modes: the single uploaded garment URL
+      const garmentUrlsToStore = mode === 'style'
+        ? selectedGarments.map(g => g.image_url)
+        : (uploadedUrl ? [uploadedUrl] : undefined);
+
       // Create full-body image record if selected
       if (selectedImageTypes.fullBody) {
         console.log('Creating full-body image record...');
         newImage = await createGeneratedImageMutation.mutateAsync({
           garment_id: garmentId,
-          garment_urls: mode === 'style' ? selectedGarments.map(g => g.image_url) : undefined,
+          garment_urls: garmentUrlsToStore,
           model_type: selectedModel?.id || 'default',
           image_url: '',
           prompt_used: prompt,
@@ -1039,7 +1049,7 @@ Based on the garment image and the information above, determine which category t
         console.log('Creating cropped image record...');
         croppedImage = await createGeneratedImageMutation.mutateAsync({
           garment_id: garmentId,
-          garment_urls: mode === 'style' ? selectedGarments.map(g => g.image_url) : undefined,
+          garment_urls: garmentUrlsToStore,
           model_type: selectedModel?.id || 'default',
           image_url: '',
           prompt_used: 'Close-up version',
@@ -1054,7 +1064,7 @@ Based on the garment image and the information above, determine which category t
         console.log('Creating lay-flat image record...');
         layFlatImage = await createGeneratedImageMutation.mutateAsync({
           garment_id: garmentId,
-          garment_urls: mode === 'style' ? selectedGarments.map(g => g.image_url) : undefined,
+          garment_urls: garmentUrlsToStore,
           model_type: selectedModel?.id || 'default',
           image_url: '',
           prompt_used: 'Lay-flat version',

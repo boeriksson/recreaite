@@ -125,12 +125,25 @@ export const handler = async (event: LambdaEvent): Promise<unknown> => {
       for (const modelName of models) {
         try {
           console.log(`Trying model: ${modelName}`);
+
+          // Build config based on model capabilities
+          // Gemini 3 Pro Image supports 1K, 2K, 4K output
+          // Gemini 2.5 Flash only supports default resolution
+          const isPro = modelName.includes('pro');
+          const config: any = {
+            responseModalities: ['TEXT', 'IMAGE'],
+          };
+
+          if (isPro) {
+            config.imageConfig = {
+              imageSize: '2K', // 2048x2048 - good balance of quality and speed
+            };
+          }
+
           response = await withRetry(() => ai.models.generateContent({
             model: modelName,
             contents: contents,
-            config: {
-              responseModalities: ['TEXT', 'IMAGE'],
-            },
+            config,
           }), 1); // Only 1 retry per model before trying next
 
           // Check if we got an image
